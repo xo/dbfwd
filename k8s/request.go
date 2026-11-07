@@ -72,7 +72,7 @@ func parseRequest(u *dburl.URL) (request, error) {
 	if req.name == "" || (strings.Contains(host, ".") && req.namespace == "") {
 		return req, fmt.Errorf("reading the host %q: %w", host, dbfwd.ErrBadURL)
 	}
-	req.typ = strings.ToLower(u.Transport)
+	req.typ = typeKey(strings.ToLower(u.Transport))
 	if p := u.Port(); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n <= 0 || n > 65535 {
@@ -112,4 +112,19 @@ func parseRequest(u *dburl.URL) (request, error) {
 	q.Del(keyRole)
 	req.query = q
 	return req, nil
+}
+
+// typeKey returns the operator or the database type that the part after the +
+// names. An operator key, such as cnpg, and a type of dbfwd, such as mariadb,
+// match as they are. Anything else goes through the aliases of dburl, so that
+// pg is postgres and my is mysql. dbfwd holds no alias list of its own
+// (AGENTS.md).
+func typeKey(s string) string {
+	if s == "" || operatorFor(s) != nil || typeNamed(s) != nil {
+		return s
+	}
+	if name, _ := dburl.SchemeNameAndAliases(s); name != "" && typeNamed(name) != nil {
+		return name
+	}
+	return s
 }

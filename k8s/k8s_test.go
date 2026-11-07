@@ -80,6 +80,11 @@ func TestParseRequest(t *testing.T) {
 		{raw: "k://pg-app:@pg.prod/", want: request{name: "pg", namespace: "prod", secretForm: true, secret: "pg-app", field: "password"}},
 		{raw: "k://pg.prod/?context=arn:aws:eks:us-east-1:1:cluster/x&role=RO&sslmode=disable", want: request{name: "pg", namespace: "prod", context: "arn:aws:eks:us-east-1:1:cluster/x", role: "ro"}},
 		{raw: "k://pg.prod/?role=primary", bad: true},
+		// an alias of dburl names the type, and a type of dbfwd wins over it
+		{raw: "k+pg://pg.prod/", want: request{name: "pg", namespace: "prod", typ: "postgres"}},
+		{raw: "k+my://db.prod/", want: request{name: "db", namespace: "prod", typ: "mysql"}},
+		{raw: "k+mariadb://db.prod/", want: request{name: "db", namespace: "prod", typ: "mariadb"}},
+		{raw: "k+cnpg://pg.prod/", want: request{name: "pg", namespace: "prod", typ: "cnpg"}},
 	}
 	for _, test := range tests {
 		t.Run(test.raw, func(t *testing.T) {

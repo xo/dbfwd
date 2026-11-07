@@ -35,7 +35,10 @@ k://my-pg-postgresql-0.dev/
 
 1. `<operator or type>` is optional. An operator, such as `cnpg`, maps to a
    database scheme, such as `postgres` (D8). A type, such as `postgres`, names
-   the database. With neither, `dbfwd` finds it (D7).
+   the database. With neither, `dbfwd` finds it (D7). A type can also be an
+   alias that `dburl` knows, such as `pg` for `postgres` or `my` for
+   `mysql`. An operator key and a type of `dbfwd`, such as `mariadb`, match
+   first, and only another name goes through the aliases of `dburl`.
 2. `<name>` is the name of a cluster CR, a Service, a Helm release, a
    StatefulSet, a Deployment or a Pod. `docs/LOOKUP.md` holds the order and
    how `dbfwd` gets from each one to a database. For a CloudNativePG cluster

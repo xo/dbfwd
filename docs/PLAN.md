@@ -110,5 +110,7 @@ fake tool and recorded output for the tests (D12).
 
 Ask Ken. Do not answer one on your own.
 
-None is open now.
+1. Listing the databases of a cluster, for a `usql` command such as `\k`
+   (D18, `docs/LIST.md`). Ken decides the name and the conventions after
+   `usql` and the flagship models have read the design.
 

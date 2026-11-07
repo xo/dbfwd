@@ -105,6 +105,7 @@ holds the command.
 | [`docs/LOOKUP.md`](docs/LOOKUP.md) | How `dbfwd` finds a database from a name, with or without an operator |
 | [`docs/OPERATORS.md`](docs/OPERATORS.md) | What each supported operator creates, and where `dbfwd` reads it |
 | [`docs/CLI.md`](docs/CLI.md) | The `dbfwd` command, which runs a native client or `usql` through a forward |
+| [`docs/LIST.md`](docs/LIST.md) | A proposal for listing the databases of a cluster |
 | [`docs/TESTING.md`](docs/TESTING.md) | How `dbfwd` is tested, locally and in CI |
 | [`docs/decisions/`](docs/decisions/README.md) | Every decision, one file each |
 | [`AGENTS.md`](AGENTS.md) | The rules for a coding agent. Every rule applies to a person too |

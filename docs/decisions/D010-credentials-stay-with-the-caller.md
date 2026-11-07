@@ -1,6 +1,6 @@
 # D10. Credentials stay with the caller
 
-Status: Decided. Amended by D16, which adds `watch` on Pods.
+Status: Decided. Amended by D16, which adds `watch` on Pods. D18, which is Proposed, adds a listing that can list across the cluster when the user asks.
 
 `dbfwd` finds a password, such as in a Kubernetes Secret, and gives it to the
 caller, and to nothing else. The rules hold for every backend.

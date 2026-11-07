@@ -42,6 +42,7 @@ every other agent read the same rules. Edit this file, not that one.
 | adding or changing an operator | `docs/OPERATORS.md`, then D8 and D9. Read the upstream source at a named release. A model answer is not a source |
 | working on credentials or RBAC | D10 |
 | working on the command line tool | `docs/CLI.md`, then D14 |
+| working on listing the databases of a cluster | `docs/LIST.md`, then D18 |
 | writing or running a test | `docs/TESTING.md`, then D12 and D13. `dbrun` in `dbmeta` starts the kind cluster |
 | asking why something is the way it is | `docs/decisions/README.md`, the index of every decision |
 | recording a decision | the rules below, under Writing documentation |
