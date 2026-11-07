@@ -56,6 +56,12 @@ linters:
     - gomodguard_v2
     # A test that opens a connection is deliberately not parallel.
     - paralleltest
+    # A backend test is in the package of the backend, because it replaces
+    # the unexported kubectl runner with a fake.
+    - testpackage
+    # exhaustruct_v5 wants every field of every literal named. A literal that
+    # sets the fields it needs and leaves the rest at zero is plain Go.
+    - exhaustruct_v5
     # noinlineerr bans `if err := f(); err != nil`, which is the form the Go
     # standard library uses and gofmt is built around.
     - noinlineerr
@@ -106,6 +112,7 @@ linters:
         - (*database/sql.Rows).Close
         - (*database/sql.DB).Close
         - (*database/sql.Stmt).Close
+        - (*github.com/xo/dbfwd.Forward).Close
     errorlint:
       errorf: true
       asserts: true

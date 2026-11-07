@@ -10,12 +10,23 @@ command. A user of `usql` never sees the name `dbfwd`.
 
 ## Where it stands
 
-The design is written and decided. No forwarding code exists yet.
+The design is decided, and the first implementation exists:
+
+1. The root package: `Resolve`, `Lookup`, `Handles`, the options, the
+   `Forward`, the registry and the errors.
+2. The `k8s` backend: the URL, the `kubectl` runner and port-forward, the
+   lookup chain except step 2, the rules of CloudNativePG, mariadb-operator,
+   MOCO and OpenEverest `pxc`, and the pod spec rules for a database with no
+   operator.
+3. Unit tests against a fake `kubectl`, and tests of the runner against a
+   stand-in `kubectl`.
+
+Nothing has run against a real cluster yet.
 
 | Area | Document | Decisions |
 | --- | --- | --- |
 | The shape: a resolver, a tool per backend, the `Forward` | this file | D2, D3, D4, D11 |
-| The Go API | `docs/API.md`, Proposed | none yet |
+| The Go API | `docs/API.md` | D15 |
 | The URL | `docs/URL.md` | D5, D6 |
 | How a name becomes a database | `docs/LOOKUP.md` | D7 |
 | The operators | `docs/OPERATORS.md` | D8, D9 |
@@ -95,17 +106,16 @@ fake tool and recorded output for the tests (D12).
 
 ## Next steps
 
-1. Ken reviews the API in `docs/API.md`.
-2. Write the `k8s` backend against a fake `kubectl`, then against a cluster
-   from `dbrun`.
-3. Check the owner chains of the CloudNativePG `Pooler` and `Database` and the
-   mariadb-operator `MaxScale` in the upstream source, before lookup step 2 is
-   written.
-4. Write `cmd/dbfwd`. `dbfwd usql` waits for the release of `usql` that reads
+1. Write the cluster tests in the `test` module, against a kind cluster from
+   `dbrun`, and record the replay files of each operator and chart.
+2. Check the owner chains of the CloudNativePG `Pooler` and `Database` and the
+   mariadb-operator `MaxScale` in the upstream source, then write lookup step
+   2.
+3. Write `cmd/dbfwd`. `dbfwd usql` waits for the release of `usql` that reads
    `USQL_DSN`.
+4. Write a full section in `docs/OPERATORS.md` for each tier 1 operator, then
+   its rules.
 
 ## Open questions
 
-Ask Ken. Do not answer one on your own.
-
-The API proposal has three, at the end of `docs/API.md`.
+None. Ask Ken before you decide a new one.

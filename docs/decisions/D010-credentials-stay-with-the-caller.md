@@ -12,5 +12,6 @@ caller, and to nothing else. The rules hold for every backend.
    own element. A password never goes in the arguments of a child process.
 4. It asks for the least privilege that the backend needs, and each backend
    documents it. For `k8s`, that is RBAC in the one namespace: `get` on each
-   kind it reads, `list` on Services for the Helm release step, and `create`
-   on `pods/portforward`. It never lists across the cluster.
+   kind it reads, `list` on Services for the Helm release step and on Pods
+   to find the pod of a Service, and `create` on `pods/portforward`. It never
+   lists across the cluster.

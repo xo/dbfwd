@@ -36,7 +36,7 @@ every other agent read the same rules. Edit this file, not that one.
 | If you are | Read |
 | --- | --- |
 | deciding what to build | `docs/PLAN.md`, which holds the open questions. Ask Ken. Do not answer one on your own |
-| working on `Resolve` or the `Forward` | `docs/API.md`, then D2, D3 and D11 |
+| working on `Resolve` or the `Forward` | `docs/API.md`, then D2, D3, D11 and D15 |
 | working on the URL | `docs/URL.md`, then D5 and D6 |
 | working on how a name becomes a database | `docs/LOOKUP.md`, then D7 |
 | adding or changing an operator | `docs/OPERATORS.md`, then D8 and D9. Read the upstream source at a named release. A model answer is not a source |
@@ -77,8 +77,9 @@ something is written down, it is not written down, and it is an open question.
 5. Every function that talks to a cluster or to the network takes
    `ctx context.Context` as its first parameter. Never call
    `context.Background()` or `context.TODO()` inside the library.
-6. Canceling a context must stop a forward and release its local port and
-   every connection it holds. A forward that outlives its context is a fault.
+6. Canceling the context of `Resolve` before it returns must stop everything
+   it started and release the local port. After `Resolve` returns, the
+   forward belongs to the caller, and `Close` stops it (D15).
 7. A password goes to the caller and nowhere else. Never write a password, a
    URL that holds one, or the raw output of a tool or a Secret to a log, an
    error message, a file or the screen. The library prints nothing, and no

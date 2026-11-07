@@ -6,9 +6,10 @@ database that runs on Kubernetes. It reads a URL such as
 port-forward, and gives back an ordinary URL for a local port. The URL holds
 no password: `dbfwd` reads it from the cluster.
 
-`dbfwd` is a Go package and a command, `dbfwd`, that runs the native client
-of a database or `usql` through the forward. Neither is ready to use. The
-design is in [`docs/PLAN.md`](docs/PLAN.md).
+`dbfwd` is a Go package, and later a command, `dbfwd`, that runs the native
+client of a database or `usql` through the forward. The package has a first
+implementation for Kubernetes and has not run against a real cluster yet.
+[`docs/PLAN.md`](docs/PLAN.md) says where it stands.
 
 ## Documents
 

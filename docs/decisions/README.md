@@ -26,3 +26,4 @@ Read the status before the decision.
 | [D12](D012-tests-replay-recorded-clusters-and-run-on-kind.md) | Tests replay recorded clusters and run on kind | Decided |
 | [D13](D013-dbrun-owns-the-kind-cluster.md) | dbrun owns the kind cluster | Decided |
 | [D14](D014-the-dbfwd-command-runs-a-native-client-or-usql.md) | The dbfwd command runs a native client or usql | Decided |
+| [D15](D015-the-go-api.md) | The Go API | Decided |

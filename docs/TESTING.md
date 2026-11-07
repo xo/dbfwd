@@ -140,7 +140,7 @@ such as `SELECT 1`. It checks:
 
 Each cluster test also runs as a ServiceAccount that has only the least RBAC
 of D10, in the one namespace: `get` on each kind that `dbfwd` reads, `list`
-on Services, and `create` on `pods/portforward`. The test proves that `dbfwd` needs nothing more. A
+on Services and Pods, and `create` on `pods/portforward`. The test proves that `dbfwd` needs nothing more. A
 second ServiceAccount has no `get` on Secrets, and the test checks that
 `Resolve` returns the RBAC error kind, apart from not found.
 

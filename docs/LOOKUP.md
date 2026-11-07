@@ -31,8 +31,9 @@ another kind appears.
 4. A Helm release. `dbfwd` lists the Services in the namespace that carry the
    label `app.kubernetes.io/instance=<name>`. It must find exactly one
    database Service, or it stops and names the candidates.
-5. A StatefulSet or a Deployment. `dbfwd` picks the pod that is marked as the
-   primary, or else the pod with ordinal 0.
+5. A StatefulSet or a Deployment. For a StatefulSet, `dbfwd` uses the pod
+   with ordinal 0, and an operator that owns it picks the primary. For a
+   Deployment, `kubectl port-forward` picks the pod.
 6. A Pod.
 
 With no type, step 1 and step 2 cover every operator that `dbfwd` supports.

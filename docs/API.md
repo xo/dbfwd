@@ -1,10 +1,10 @@
 # The API
 
-This document proposes the Go API of the root package `dbfwd` and the shape of
-the `k8s` backend. It is Proposed. When Ken accepts it, it becomes a decision,
-and this document holds the detail.
+This document holds the Go API of the root package `dbfwd` and the shape of
+the `k8s` backend. D15 holds the decision, and the code follows this
+document. `go doc` is the reference for each name.
 
-The API follows D2, D3, D7, D10 and D11. Every name below is a proposal.
+The API follows D2, D3, D7, D10 and D11.
 Kubernetes is the only backend now. The root package names nothing that only
 Kubernetes has, so that the future backends in `docs/PLAN.md` fit with no
 change to a caller.
@@ -262,8 +262,13 @@ const (
 	// ErrQueryKey is the error when a driver key has the name of a key of the
 	// backend.
 	ErrQueryKey Error = "query key clashes with a key of the backend"
+	// ErrBadURL is the error when a URL cannot be read. It names no part of
+	// the URL, because a local URL holds a password.
+	ErrBadURL Error = "the URL is not valid"
 	// ErrForwardLost is the error when a running forward stops on its own.
 	ErrForwardLost Error = "forward lost"
+	// ErrClosed is the error when a forward is used after Close.
+	ErrClosed Error = "forward closed"
 )
 
 // LookupError is the error of a lookup that failed. It names what was tried,
@@ -307,9 +312,13 @@ type Opened struct {
 	// URL is the URL of the local end, as a string for dburl.Parse.
 	URL string
 
-	// Renew makes a new URL when the credential expires. It is nil when the
+	// Expires is when the credential in URL expires. It is zero when the
 	// credential does not expire, as for Kubernetes.
-	Renew func(ctx context.Context) (string, error)
+	Expires time.Time
+
+	// Renew makes a new URL and returns when it expires. It is nil when the
+	// credential does not expire.
+	Renew func(ctx context.Context) (string, time.Time, error)
 
 	User     string
 	Database string
@@ -405,30 +414,10 @@ reads the port from the line `Forwarding from 127.0.0.1:<port>`.
 A later backend has the same shape: a package that registers itself, an
 unexported runner for its tool, and its own query keys and lookup.
 
-## A change to hard rule 6
-
-Hard rule 6 in `AGENTS.md` says that canceling a context stops a forward. That
-holds while `Resolve` runs. After it returns, the forward belongs to the
-caller, and `Close` stops it. If Ken accepts this API, rule 6 says so.
-
 ## What usql said
 
-`usql` reviewed this proposal. It fits: `WithInteractive` takes `l.Release`
-from `rline` v0.8.0 as it is, `Handles` comes before `drivers.Open`, and
-`Target` holds what `\conninfo` shows. Its four changes are in the text above:
-the URL from `dburl.Parse`, an error for a missing tool, `ErrUnauthorized`,
-and the wording of `ErrUnsupported`. On the questions below, `usql` says:
-
-1. The blank import is right for `usql`. It matches `database/sql`, and a
-   build of `usql` can leave the `k8s` backend out.
-2. `usql` needs no fixed local port.
-
-`usql` passes only `WithInteractive`. A person picks the context with
-`?context=` and the kubeconfig with `KUBECONFIG`.
-
-## Questions for Ken
-
-1. Is the blank import of `k8s` right, or does the root package link the
-   `k8s` backend itself, so that a caller imports one package?
-2. Does `Forward` need a fixed local port as an option, or is a port that the
-   tool chooses enough?
+`usql` reviewed this API. It fits: `WithInteractive` takes `l.Release` from
+`rline` v0.8.0 as it is, `Handles` comes before `drivers.Open`, and `Target`
+holds what `\conninfo` shows. `usql` opens its pool with a
+`driver.Connector` of its own that calls `URL` for each new connection, and
+it needs no fixed local port.
