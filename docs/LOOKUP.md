@@ -77,7 +77,9 @@ this order:
 
 1. The image name: `postgres`, `postgresql`, `mysql`, `mariadb`, `mongo`,
    `mongodb`, `mssql/server`, `clickhouse`, `redis` or `valkey`. The registry
-   and the tag do not count.
+   and the tag do not count. SQL Server matches only under an `mssql` path,
+   such as `mcr.microsoft.com/mssql/server` or `mssql/rhel/server`, because a
+   bare `server` is the image of many other programs, such as authentik.
 2. The port that the Service targets.
 3. A port with a known name or number: 5432, 3306, 27017, 1433, 6379, 8123 or
    9000.

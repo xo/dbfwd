@@ -148,7 +148,7 @@ func TestList(t *testing.T) {
 	}
 	want := []summary{
 		{"prod", "billing", "Database", "postgres", "CloudNativePG", "CloudNativePG Cluster pg", "k://billing.prod/", []string{"rw"}, 3, 3, []string{"billing"}, "Secret pg-app key password"},
-		{"prod", "pg", "Cluster", "postgres", "CloudNativePG", "CloudNativePG Cluster pg", "k://pg.prod/", []string{"rw", "ro"}, 3, 3, []string{"app"}, "Secret pg-app key password"},
+		{"prod", "pg", "Cluster", "postgres", "CloudNativePG", "CloudNativePG Cluster pg", "k://pg.prod/", []string{"rw", "ro"}, 3, 3, []string{"app", "billing"}, "Secret pg-app key password"},
 		{"prod", "pg-pooler-rw", "Pooler", "postgres", "CloudNativePG", "CloudNativePG Cluster pg", "k://pg-pooler-rw.prod/", []string{"rw"}, 1, 1, []string{"app"}, "Secret pg-app key password"},
 		{"prod", "pgsts", "StatefulSet", "postgres", "", "Helm release shop", "k://pgsts.prod/", []string{"rw"}, 1, 1, []string{"postgres"}, "Secret pgsts key password"},
 		{"prod", "shop", "Cluster", "postgres", "CloudNativePG", "CloudNativePG Cluster shop", "k://shop.prod/", []string{"rw"}, 0, 0, []string{"app"}, "Secret shop-app key password"},
@@ -327,5 +327,94 @@ func TestListURL(t *testing.T) {
 				t.Errorf("ListURL = %q, expected %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestImageType(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		image string
+		want  string
+	}{
+		{"postgres:18", "postgres"},
+		{"docker.io/library/postgres:18@sha256:abc", "postgres"},
+		{"docker.io/bitnami/postgresql:17", "postgres"},
+		{"mcr.microsoft.com/mssql/server:2022-latest", "sqlserver"},
+		{"mcr.microsoft.com/mssql/rhel/server:2022-latest", "sqlserver"},
+		{"mssql/server:2022-latest", "sqlserver"},
+		// the server and the worker of authentik are no database
+		{"ghcr.io/goauthentik/server:2025.10.1", ""},
+		{"server:1", ""},
+		{"nginx:1.29", ""},
+	}
+	for _, test := range tests {
+		t.Run(test.image, func(t *testing.T) {
+			t.Parallel()
+			got := ""
+			if typ := imageType(test.image); typ != nil {
+				got = typ.name
+			}
+			if got != test.want {
+				t.Errorf("imageType = %q, expected %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestListLeavesOutAuthentik(t *testing.T) {
+	t.Parallel()
+	r := newFake()
+	r.addListed("deployments.apps", "Deployment", "apps/v1", "auth", map[string]any{
+		"metadata": map[string]any{"name": "authentik-server"},
+		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{"containers": []any{map[string]any{
+			"name": "server", "image": "ghcr.io/goauthentik/server:2025.10.1",
+			"env": []any{map[string]any{"name": "AUTHENTIK_POSTGRESQL__PASSWORD", "valueFrom": map[string]any{"secretKeyRef": map[string]any{"name": "authentik", "key": "password"}}}},
+		}}}}},
+	})
+	l, err := listWith(t, r, "k://*.auth")
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+	if len(l.Entries) != 0 {
+		t.Errorf("Entries = %+v, expected none for authentik", summarize(l))
+	}
+}
+
+func TestListDatabaseOfTheSameName(t *testing.T) {
+	t.Parallel()
+	r := newFake()
+	const cnpgAPI = "postgresql.cnpg.io/v1"
+	// immich: a Database with the name of its cluster, which opens the
+	// database of the cluster, as a Helm chart makes it
+	r.addListed("clusters.postgresql.cnpg.io", "Cluster", cnpgAPI, "immich", map[string]any{
+		"metadata": map[string]any{"name": "immich-postgresql"},
+		"spec":     map[string]any{"bootstrap": map[string]any{"initdb": map[string]any{"database": "immich", "owner": "immich"}}},
+	})
+	r.addListed("databases.postgresql.cnpg.io", "Database", cnpgAPI, "immich", map[string]any{
+		"metadata": map[string]any{"name": "immich-postgresql"},
+		"spec":     map[string]any{"cluster": map[string]any{"name": "immich-postgresql"}, "name": "immich", "owner": "immich"},
+	})
+	// photos: a Database with the name of its cluster, which opens another
+	// database
+	r.addListed("clusters.postgresql.cnpg.io", "Cluster", cnpgAPI, "immich", map[string]any{"metadata": map[string]any{"name": "photos"}})
+	r.addListed("databases.postgresql.cnpg.io", "Database", cnpgAPI, "immich", map[string]any{
+		"metadata": map[string]any{"name": "photos"},
+		"spec":     map[string]any{"cluster": map[string]any{"name": "photos"}, "name": "pics", "owner": "app"},
+	})
+	l, err := listWith(t, r, "k://*.immich")
+	if err != nil {
+		t.Fatalf("List error = %v", err)
+	}
+	var got []string
+	for _, e := range l.Entries {
+		got = append(got, e.Target.Kind+" "+e.Target.Name+" "+e.URL+" "+strings.Join(e.Databases, ","))
+	}
+	want := []string{
+		"Cluster immich-postgresql k://immich-postgresql.immich/ immich",
+		"Cluster photos k://photos.immich/ app,pics",
+		"Database photos k://photos.immich/pics pics",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("entries =\n%s\nexpected\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

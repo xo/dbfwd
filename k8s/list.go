@@ -424,6 +424,13 @@ type row struct {
 	entry dbfwd.Entry
 	obj   object
 	op    *operator
+
+	// For a child that opens another database of its cluster, such as a
+	// CloudNativePG Database, cluster is the name of the cluster, database
+	// the database, and user the user when it is not that of the cluster.
+	// They give a URL through the cluster when the name of the child does not
+	// reach it.
+	cluster, database, user string
 }
 
 // entries builds one entry for each database in the inventory. context is
@@ -445,7 +452,8 @@ func (inv *inventory) entries(context, named string) []dbfwd.Entry {
 // names another database or another way in.
 func (inv *inventory) operatorRows(context string) []row {
 	var rows []row
-	clusters := map[string]dbfwd.Entry{}
+	// clusters holds the index of the row of each cluster CR
+	clusters := map[string]int{}
 	for _, op := range operators {
 		for _, cr := range inv.ofKind(op.groups, op.kind) {
 			if inv.foldsInto(op, cr) {
@@ -467,7 +475,7 @@ func (inv *inventory) operatorRows(context string) []row {
 				selectors = append(selectors, ro.pods)
 			}
 			countPods(&e, inv.podsOf(ns, cr, selectors...))
-			clusters[keyOf(cr)] = e
+			clusters[keyOf(cr)] = len(rows)
 			rows = append(rows, row{entry: e, obj: cr, op: op})
 		}
 	}
@@ -479,27 +487,57 @@ func (inv *inventory) operatorRows(context string) []row {
 				if !ok {
 					continue
 				}
-				f, err := op.build(cr, c.role(obj))
+				base, err := op.build(cr, c.role(obj))
 				if err != nil {
 					continue
 				}
+				f, _ := op.build(cr, c.role(obj))
 				c.apply(obj, f)
+				parent, hasParent := clusters[keyOf(cr)]
+				db := ""
+				if f.database.set && f.database.secret == "" {
+					db = f.database.value
+				}
+				if hasParent && db != "" && !slices.Contains(rows[parent].entry.Databases, db) {
+					rows[parent].entry.Databases = append(rows[parent].entry.Databases, db)
+				}
+				if sameEndpoint(base, f) {
+					// a child that opens the database of its cluster, as the
+					// cluster does, is no other database
+					continue
+				}
 				e := newEntry(context, ns, op, f)
 				e.Target.Kind, e.Target.Name = c.kind, obj.name()
 				e.Target.Owner = op.name + " " + op.kind + " " + cr.name()
 				e.Roles = []string{pick(f.role)}
 				if pods := inv.podsOf(ns, obj); len(pods) > 0 {
 					countPods(&e, pods)
-				} else if parent, ok := clusters[keyOf(cr)]; ok {
+				} else if hasParent {
 					// a child with no pods of its own, such as a Database,
 					// runs on the pods of its cluster
-					e.Ready, e.Pods = parent.Ready, parent.Pods
+					e.Ready, e.Pods = rows[parent].entry.Ready, rows[parent].entry.Pods
 				}
-				rows = append(rows, row{entry: e, obj: obj, op: op})
+				r := row{entry: e, obj: obj, op: op}
+				if f.forward == base.forward && db != "" {
+					r.cluster, r.database = cr.name(), db
+					if u := f.account.user; u.secret == "" && u.show() != base.account.user.show() {
+						r.user = u.value
+					}
+				}
+				rows = append(rows, r)
 			}
 		}
 	}
 	return rows
+}
+
+// sameEndpoint reports whether what a child gives is what its cluster gives:
+// the same forward, database and account.
+func sameEndpoint(a, b *found) bool {
+	return a.forward == b.forward && a.port == b.port &&
+		a.database.show() == b.database.show() &&
+		a.account.user.show() == b.account.user.show() &&
+		a.account.password.show() == b.account.password.show()
 }
 
 // foldsInto reports whether a cluster CR belongs to the row of another CR:
@@ -630,16 +668,35 @@ func source(c credential) string {
 }
 
 // shortestURL returns the shortest URL that Resolve maps to the database of a
-// row: k://<name>.<namespace>/ when the name reaches it, and with the key of
-// the operator when another object of the name comes first in the lookup.
+// row: k://<name>.<namespace>/ when the name reaches it, with the key of the
+// operator when that reaches it and another object of the name comes first,
+// and through the cluster with the database in the path for a child whose name
+// reaches neither.
 // named is the context that the listing named, which the URL keeps.
 func (inv *inventory) shortestURL(r row, named string) string {
 	ns, nm := namespaceOf(r.obj), r.obj.name()
-	scheme := "k"
-	if first, ok := inv.firstMatch(ns, nm, operators); ok && !inv.sameDatabase(first, r.obj) && r.op != nil {
-		scheme = "k+" + r.op.key
+	u := "k://" + nm + "." + ns + "/"
+	if first, ok := inv.firstMatch(ns, nm, operators); ok && !inv.sameDatabase(first, r.obj) {
+		ok := false
+		if r.op != nil {
+			first, found := inv.firstMatch(ns, nm, []*operator{r.op})
+			ok = found && inv.sameDatabase(first, r.obj)
+		}
+		switch {
+		case ok:
+			u = "k+" + r.op.key + "://" + nm + "." + ns + "/"
+		case r.cluster != "":
+			// the name of the child reaches its cluster first, so the URL
+			// names the cluster and the database of the child
+			userPart := ""
+			if r.user != "" {
+				userPart = url.User(r.user).String() + "@"
+			}
+			u = "k://" + userPart + r.cluster + "." + ns + "/" + url.PathEscape(r.database)
+		case r.op != nil:
+			u = "k+" + r.op.key + "://" + nm + "." + ns + "/"
+		}
 	}
-	u := scheme + "://" + nm + "." + ns + "/"
 	if named != "" {
 		u += "?" + url.Values{keyContext: {named}}.Encode()
 	}

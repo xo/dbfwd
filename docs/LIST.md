@@ -146,6 +146,10 @@ top of its chain.
 2. **A child that names another database** is a row of its own, owned by the
    cluster. A CloudNativePG `Database` is a row, because
    `k://billing.prod/` opens another database than the cluster's row does.
+   A `Database` that opens the database of its cluster, with the same owner,
+   is no other database. It is no row, as a Helm chart makes it with the
+   name of the cluster. The `Databases` of the cluster's row lists the
+   database of every `Database` of the cluster, either way.
 3. **A child that is another way in** is a row of its own too. A CloudNativePG
    `Pooler` is a row, owned by the cluster, because a user can choose to
    connect through PgBouncer.
@@ -157,10 +161,16 @@ The URL of a row is the shortest that `Resolve` maps to the same database:
 
 1. `k://<name>.<namespace>/` when the name alone reaches it.
 2. `k+<operator>://<name>.<namespace>/` when another object in the namespace
-   has the same name and `k://` matches it first, or is ambiguous.
-   `dbfwd` checks the rows of the listing against the lookup order of
-   `docs/LOOKUP.md`, so it needs no extra call.
-3. `?context=<name>` when the URL of the listing named a context.
+   has the same name and `k://` matches it first, and the key of the
+   operator reaches the row. `dbfwd` checks the rows of the listing against
+   the lookup order of `docs/LOOKUP.md`, so it needs no extra call.
+3. `k://[<user>@]<cluster>.<namespace>/<database>` for a child that opens
+   another database of its cluster, when its name reaches neither. A
+   CloudNativePG `Database` named `photos`, for the database `pics` of the
+   cluster `photos`, has the URL `k://photos.prod/pics`, because
+   `k+cnpg://photos.prod/` matches the cluster first. The user is there only
+   when it is not the user of the cluster.
+4. `?context=<name>` when the URL of the listing named a context.
 
 For a database with no operator, the URL can match its Service before its
 StatefulSet. Both reach the same database, which is what the URL promises.

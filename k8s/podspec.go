@@ -78,7 +78,7 @@ var dbTypes = []*dbType{
 	{
 		name: "sqlserver", scheme: "sqlserver", port: 1433, supported: true,
 		prefixes: []string{"MSSQL_", "SA_PASSWORD"},
-		images:   []string{"mssql/server", "server"},
+		images:   []string{"mssql/server"},
 		accounts: func(e env) (account, map[string]account, credential) {
 			sa := account{user: literal("sa"), password: e.first("MSSQL_SA_PASSWORD", "SA_PASSWORD")}
 			return sa, map[string]account{"sa": sa}, literal("master")
@@ -243,7 +243,10 @@ func imageBase(image string) string {
 	if i := strings.LastIndexByte(image, ':'); i > strings.LastIndexByte(image, '/') {
 		image = image[:i]
 	}
-	if strings.HasSuffix(image, "mssql/server") {
+	// SQL Server images live under an mssql path, such as
+	// mcr.microsoft.com/mssql/server or mcr.microsoft.com/mssql/rhel/server.
+	// A bare server is the image of many other programs, such as authentik.
+	if path.Base(image) == "server" && (strings.HasPrefix(image, "mssql/") || strings.Contains(image, "/mssql/")) {
 		return "mssql/server"
 	}
 	return path.Base(image)
