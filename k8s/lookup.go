@@ -17,6 +17,7 @@ const (
 	resultNoMatch      = "no match"
 	resultNotInstalled = "not installed"
 	resultNotAllowed   = "not allowed"
+	resultFailed       = "failed"
 )
 
 // lookup runs the lookup chain of D7 for one request.
@@ -27,6 +28,19 @@ type lookup struct {
 	steps []dbfwd.Step
 	// forbidden is set when a step was not allowed.
 	forbidden bool
+
+	// installed holds the resources that the cluster has, or is nil when the
+	// cluster did not say.
+	installed map[string]bool
+}
+
+// getCR reads a custom resource, and skips the call when the cluster said that
+// the resource is not installed.
+func (l *lookup) getCR(ctx context.Context, resource, name string) (object, error) {
+	if l.installed != nil && !l.installed[resource] {
+		return nil, errNotInstalled
+	}
+	return l.k.get(ctx, resource, name)
 }
 
 // step records a step and turns its error into a result. It returns true when
@@ -47,6 +61,7 @@ func (l *lookup) step(kind string, err error) (bool, error) {
 		l.forbidden = true
 		return true, nil
 	}
+	l.steps = append(l.steps, dbfwd.Step{Kind: kind, Result: resultFailed})
 	return false, err
 }
 
@@ -63,15 +78,28 @@ func (l *lookup) run(ctx context.Context) (*found, error) {
 	}
 	// step 1: a cluster CR of a supported operator
 	for _, op := range ops {
-		cr, err := l.k.get(ctx, op.resource, l.req.name)
+		cr, err := l.getCR(ctx, op.resource, l.req.name)
 		if next, err := l.step(op.name+" "+op.kind, err); err != nil {
 			return nil, l.fail(err)
 		} else if !next {
 			return l.fromOperator(op, cr, "")
 		}
 	}
-	// step 2, the other resources of an operator, waits until their owner
-	// chains are read from the upstream source (docs/PLAN.md)
+	// step 2: another resource of an operator that names a cluster
+	for _, op := range ops {
+		for _, c := range op.children {
+			obj, err := l.getCR(ctx, c.resource, l.req.name)
+			if next, err := l.step(op.name+" "+c.kind, err); err != nil {
+				return nil, l.fail(err)
+			} else if !next {
+				f, err := l.fromChild(ctx, op, c, obj)
+				if err != nil {
+					return nil, l.fail(err)
+				}
+				return f, nil
+			}
+		}
+	}
 	type kindStep struct {
 		kind string
 		try  func(context.Context) (*found, error)
@@ -123,38 +151,91 @@ func (l *lookup) fromOperator(op *operator, cr object, via string) (*found, erro
 	return f, nil
 }
 
-// owned follows the owner references of o up to a cluster CR. It returns the
-// operator and the CR, or nil when no operator manages o.
-func (l *lookup) owned(ctx context.Context, o object) (*operator, object, error) {
+// fromChild builds what a lookup found from a resource that names a cluster,
+// such as a CloudNativePG Pooler.
+func (l *lookup) fromChild(ctx context.Context, op *operator, c *child, obj object) (*found, error) {
+	name := c.cluster(obj)
+	if name == "" {
+		return nil, fmt.Errorf("reading the cluster of the %s %s: %w", c.kind, obj.name(), dbfwd.ErrNotFound)
+	}
+	cr, err := l.k.get(ctx, op.resource, name)
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			return nil, fmt.Errorf("reading the cluster %s of the %s %s: %w", name, c.kind, obj.name(), dbfwd.ErrNotFound)
+		}
+		return nil, err
+	}
+	role := l.req.role
+	if implied := c.role(obj); implied != "" {
+		if role != "" && role != implied {
+			return nil, fmt.Errorf("using role %s with the %s %s, which is %s: %w", role, c.kind, obj.name(), implied, dbfwd.ErrRoleConflict)
+		}
+		role = implied
+	}
+	f, err := op.build(cr, role)
+	if err != nil {
+		return nil, err
+	}
+	c.apply(obj, f)
+	f.target.Kind, f.target.Name = c.kind, obj.name()
+	f.target.Owner = op.name + " " + op.kind + " " + cr.name()
+	return f, nil
+}
+
+// ownedBy is the operator that manages an object, and the cluster CR, or the
+// child resource, that it reached.
+type ownedBy struct {
+	op       *operator
+	cr       object
+	child    *child
+	childObj object
+}
+
+// owned follows the owner references of o up to a cluster CR or a child
+// resource of an operator. It returns nil when no operator manages o.
+func (l *lookup) owned(ctx context.Context, o object) (*ownedBy, error) {
 	for range 4 {
 		ref, ok := o.controller()
 		if !ok {
-			return nil, nil, nil
+			return nil, nil
 		}
 		for _, op := range operators {
 			if op.owns(ref.kind, ref.group) {
 				cr, err := l.k.get(ctx, op.resource, ref.name)
-				return op, cr, err
+				return &ownedBy{op: op, cr: cr}, err
+			}
+			if c := op.childOf(ref.kind, ref.group); c != nil {
+				obj, err := l.k.get(ctx, c.resource, ref.name)
+				return &ownedBy{op: op, child: c, childObj: obj}, err
 			}
 		}
 		if group, ok := perconaKinds[ref.kind]; ok && group == ref.group {
 			cr, err := l.k.get(ctx, everest.resource, ref.name)
-			return everest, cr, err
+			return &ownedBy{op: everest, cr: cr}, err
 		}
 		var resource string
 		switch ref.kind {
 		case "StatefulSet", "ReplicaSet", "Deployment":
 			resource = strings.ToLower(ref.kind) + ".apps"
 		default:
-			return nil, nil, nil
+			return nil, nil
 		}
 		next, err := l.k.get(ctx, resource, ref.name)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		o = next
 	}
-	return nil, nil, nil
+	return nil, nil
+}
+
+// fromOwner builds what a lookup found from the operator that manages an
+// object. via is the Service that matched, or empty.
+func (l *lookup) fromOwner(ctx context.Context, by *ownedBy, via string) (*found, error) {
+	if by.child != nil {
+		return l.fromChild(ctx, by.op, by.child, by.childObj)
+	}
+	return l.fromOperator(by.op, by.cr, via)
 }
 
 // service is step 3: a Service with the name.
@@ -172,10 +253,10 @@ func (l *lookup) fromService(ctx context.Context, svc object) (*found, error) {
 	if svc.str("spec", "type") == "ExternalName" {
 		return nil, fmt.Errorf("forwarding to the service %s, which points outside the cluster: %w", name, dbfwd.ErrUnsupported)
 	}
-	if op, cr, err := l.owned(ctx, svc); err != nil {
+	if by, err := l.owned(ctx, svc); err != nil {
 		return nil, err
-	} else if op != nil {
-		f, err := l.fromOperator(op, cr, name)
+	} else if by != nil {
+		f, err := l.fromOwner(ctx, by, name)
 		if err != nil {
 			return nil, err
 		}
@@ -303,10 +384,10 @@ func (l *lookup) pod(ctx context.Context) (*found, error) {
 // fromPod builds what a lookup found from a Pod.
 func (l *lookup) fromPod(ctx context.Context, pod object) (*found, error) {
 	name := pod.name()
-	if op, cr, err := l.owned(ctx, pod); err != nil {
+	if by, err := l.owned(ctx, pod); err != nil {
 		return nil, err
-	} else if op != nil {
-		f, err := l.fromOperator(op, cr, "")
+	} else if by != nil {
+		f, err := l.fromOwner(ctx, by, "")
 		if err != nil {
 			return nil, err
 		}

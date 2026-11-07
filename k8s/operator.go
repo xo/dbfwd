@@ -29,6 +29,40 @@ type operator struct {
 	// roleOf returns the role that a Service of the cluster implies, or
 	// empty.
 	roleOf func(cluster, service string) string
+
+	// children are the other resources of the operator that name a cluster,
+	// for lookup step 2.
+	children []*child
+}
+
+// child is a resource of an operator that names a cluster, such as a
+// CloudNativePG Pooler.
+type child struct {
+	// kind and resource name the resource.
+	kind     string
+	resource string
+
+	// cluster returns the name of the cluster that obj names.
+	cluster func(obj object) string
+
+	// role returns the role that obj implies, or empty.
+	role func(obj object) string
+
+	// apply changes what the cluster gives, for obj.
+	apply func(obj object, f *found)
+}
+
+// childOf returns the child of the operator with the kind and group.
+func (op *operator) childOf(kind, group string) *child {
+	if !slices.Contains(op.groups, group) {
+		return nil
+	}
+	for _, c := range op.children {
+		if c.kind == kind {
+			return c
+		}
+	}
+	return nil
 }
 
 // owns reports whether the operator manages objects of the kind and group.
@@ -122,6 +156,46 @@ var cnpg = &operator{
 			return roleRO
 		}
 		return ""
+	},
+	children: []*child{cnpgPooler, cnpgDatabase},
+}
+
+// cnpgPooler is a CloudNativePG Pooler, which runs PgBouncer in front of a
+// cluster. Its Service has its name and the port 5432. PgBouncer checks a
+// password against the cluster, so the accounts of the cluster work through
+// it. Read at v1.30.1.
+var cnpgPooler = &child{
+	kind:     "Pooler",
+	resource: "poolers.postgresql.cnpg.io",
+	cluster:  func(obj object) string { return obj.str("spec", "cluster", "name") },
+	role: func(obj object) string {
+		switch obj.str("spec", "type") {
+		case "", roleRW:
+			return roleRW
+		case roleRO:
+			return roleRO
+		}
+		return ""
+	},
+	apply: func(obj object, f *found) {
+		f.forward, f.port = "service/"+obj.name(), 5432
+	},
+}
+
+// cnpgDatabase is a CloudNativePG Database, which names a database of a
+// cluster and its owner. Read at v1.30.1.
+var cnpgDatabase = &child{
+	kind:     "Database",
+	resource: "databases.postgresql.cnpg.io",
+	cluster:  func(obj object) string { return obj.str("spec", "cluster", "name") },
+	role:     func(object) string { return "" },
+	apply: func(obj object, f *found) {
+		if db := obj.str("spec", "name"); db != "" {
+			f.database = literal(db)
+		}
+		if acct, ok := f.users[obj.str("spec", "owner")]; ok {
+			f.account = acct
+		}
 	},
 }
 

@@ -15,9 +15,9 @@ The design is decided, and the first implementation exists:
 1. The root package: `Resolve`, `Lookup`, `Handles`, the options, the
    `Forward`, the registry and the errors.
 2. The `k8s` backend: the URL, the `kubectl` runner and port-forward, the
-   lookup chain except step 2, the rules of CloudNativePG, mariadb-operator,
-   MOCO and OpenEverest `pxc`, and the pod spec rules for a database with no
-   operator.
+   lookup chain, the rules of CloudNativePG with its Pooler and Database,
+   mariadb-operator, MOCO and OpenEverest `pxc`, and the pod spec rules for a
+   database with no operator.
 3. The command `cmd/dbfwd`, with `dbfwd <url>`, `usql`, `forward`, `lookup`
    and `clients`.
 4. Unit tests against a fake `kubectl`, and tests of the runner against a
@@ -26,8 +26,9 @@ The design is decided, and the first implementation exists:
 The command ran by hand on 2026-11-07 against a kind cluster from `dbrun`,
 with CloudNativePG v1.30.1 and with a StatefulSet of the official `postgres`
 image. `psql` and `usql` connected through the cluster name, the Services
-`pg-rw` and `shop-db`, a Pod, and the Secret form `pg-app:@`. No automated
-test runs against a cluster yet.
+`pg-rw`, `pg-r` and `shop-db`, a Pod, a CloudNativePG Pooler and its pod,
+and the Secret form `pg-app:@`. No automated test runs against a cluster
+yet.
 
 | Area | Document | Decisions |
 | --- | --- | --- |
@@ -114,9 +115,8 @@ fake tool and recorded output for the tests (D12).
 
 1. Write the cluster tests in the `test` module, against a kind cluster from
    `dbrun`, and record the replay files of each operator and chart.
-2. Check the owner chains of the CloudNativePG `Pooler` and `Database` and the
-   mariadb-operator `MaxScale` in the upstream source, then write lookup step
-   2.
+2. Read the owner chain of the mariadb-operator `MaxScale` in the upstream
+   source, then add it to lookup step 2.
 3. Write a full section in `docs/OPERATORS.md` for each tier 1 operator, then
    its rules.
 

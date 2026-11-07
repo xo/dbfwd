@@ -25,7 +25,9 @@ Release v1.30.1, from `cloudnative-pg/cloudnative-pg`. The scheme maps to
 | Secret keys | `username`, `password`, `dbname`, `host`, `port`, `uri` and others. The type is `kubernetes.io/basic-auth` |
 | Other users | `spec.managed.roles`, and the `DatabaseRole` CR from v1.30. Each has `passwordSecret` |
 | Superuser | `<cluster>-superuser`, user `postgres`. It exists only when `enableSuperuserAccess` is true, and the default is false |
-| Service | `<cluster>-rw` for the primary, `<cluster>-ro` for replicas, port 5432 |
+| Service | `<cluster>-rw` for the primary, `<cluster>-ro` for replicas, `<cluster>-r` for any instance, port 5432 |
+| Pooler | `Pooler`, `postgresql.cnpg.io/v1`. `spec.cluster.name` names the cluster, and `spec.type` is `rw`, `ro` or `r`. Its Service has its name and the port 5432, and the Service and the Deployment have an owner reference to it. PgBouncer checks a password against the cluster, so the accounts of the cluster work through it |
+| Database | `Database`, `postgresql.cnpg.io/v1`. `spec.cluster.name`, `spec.name` is the database, and `spec.owner` is its owner. It has no Secret |
 
 ## mariadb-operator
 

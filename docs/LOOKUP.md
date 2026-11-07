@@ -24,9 +24,10 @@ another kind appears.
 
 1. A cluster CR of a supported operator, such as a CloudNativePG `Cluster`.
 2. Another resource of an operator that names a cluster: a CloudNativePG
-   `Pooler`, a CloudNativePG `Database`, or a mariadb-operator `MaxScale`.
-   Their owner chains are not yet read from the upstream source. That comes
-   before this step is written.
+   `Pooler` or a CloudNativePG `Database`. A Pooler forwards to its own
+   Service, and a Database picks its database and its owner. The
+   mariadb-operator `MaxScale` waits until its owner chain is read from the
+   upstream source.
 3. A Service.
 4. A Helm release. `dbfwd` lists the Services in the namespace that carry the
    label `app.kubernetes.io/instance=<name>`. It must find exactly one
@@ -47,7 +48,8 @@ pg-rw, owned by CloudNativePG Cluster pg". `usql` shows that in `\conninfo`.
 ## From a match to a database
 
 A match from step 3, 5 or 6 can belong to an operator. `dbfwd` follows the
-owner references of the object up to a cluster CR. If it reaches one, it uses
+owner references of the object up to a cluster CR, or to a resource of step
+2, such as the Pooler that owns a Service or the Deployment of PgBouncer. If it reaches one, it uses
 the rules of that operator in `docs/OPERATORS.md`, and the Service or Pod
 picks the role: `pg-rw` is the primary, and `pg-ro` is a replica. If the URL
 also gives a `role` that disagrees, `Resolve` stops with an error (D6).

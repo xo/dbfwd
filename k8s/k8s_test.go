@@ -151,6 +151,112 @@ func TestCNPGOneInstanceHasNoReplica(t *testing.T) {
 	}
 }
 
+// cnpgPoolers adds a Pooler of each type to the cluster pg, with the Service
+// and the Deployment of the rw one.
+func cnpgPoolers(r *fakeRunner) {
+	for _, p := range []struct{ name, typ string }{{"pg-pooler-rw", "rw"}, {"pg-pooler-ro", "ro"}} {
+		r.add("poolers.postgresql.cnpg.io", map[string]any{
+			"metadata": meta(p.name, nil),
+			"spec":     map[string]any{"cluster": map[string]any{"name": "pg"}, "type": p.typ},
+		})
+	}
+	r.add("service", map[string]any{
+		"metadata": meta("pg-pooler-rw", map[string]string{"cnpg.io/cluster": "pg"}, cnpgGroup, "Pooler", "pg-pooler-rw"),
+		"spec":     map[string]any{"ports": []any{map[string]any{"port": 5432, "targetPort": "pgbouncer"}}},
+	})
+	r.add("deployment.apps", map[string]any{
+		"metadata": meta("pg-pooler-rw", nil, cnpgGroup, "Pooler", "pg-pooler-rw"),
+	})
+	r.add("replicaset.apps", map[string]any{
+		"metadata": meta("pg-pooler-rw-7d9f", nil, "apps/v1", "Deployment", "pg-pooler-rw"),
+	})
+	r.add("pod", map[string]any{
+		"metadata": meta("pg-pooler-rw-7d9f-abcde", nil, "apps/v1", "ReplicaSet", "pg-pooler-rw-7d9f"),
+	})
+}
+
+func TestCNPGPooler(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct{ raw, forward, kind string }{
+		{"k://pg-pooler-rw.prod/", "service/pg-pooler-rw :5432", "Pooler"},
+		{"k+cnpg://pg-pooler-ro.prod/", "service/pg-pooler-ro :5432", "Pooler"},
+		{"k://pg-pooler-rw-7d9f-abcde.prod/", "pod/pg-pooler-rw-7d9f-abcde :5432", "Pod"},
+	} {
+		t.Run(test.raw, func(t *testing.T) {
+			t.Parallel()
+			r := newFake()
+			cnpgCluster(r, false)
+			cnpgPoolers(r)
+			o, err := open(t, r, test.raw)
+			if err != nil {
+				t.Fatalf("Open error = %v", err)
+			}
+			if !strings.HasSuffix(r.forwards[0], test.forward) {
+				t.Errorf("forward = %q, expected %s", r.forwards[0], test.forward)
+			}
+			u := localOf(t, o)
+			pass, _ := u.User.Password()
+			if u.User.Username() != "app" || pass != "app-pass" || u.Path != "/app" {
+				t.Errorf("local URL = %s, expected the app account of the cluster", o.URL)
+			}
+			if o.Target.Kind != test.kind || o.Target.Owner != "CloudNativePG Cluster pg" {
+				t.Errorf("target = %+v, expected a %s owned by the cluster pg", o.Target, test.kind)
+			}
+		})
+	}
+	r := newFake()
+	cnpgCluster(r, false)
+	cnpgPoolers(r)
+	if _, err := open(t, r, "k://pg-pooler-ro.prod/?role=rw"); !errors.Is(err, dbfwd.ErrRoleConflict) {
+		t.Errorf("Open of the ro pooler with role=rw error = %v, expected %v", err, dbfwd.ErrRoleConflict)
+	}
+}
+
+func TestServiceOfAPoolerByName(t *testing.T) {
+	t.Parallel()
+	// with no type, the Service of a Pooler matches in step 2 by the name of
+	// the Pooler, before the Service step
+	r := newFake()
+	cnpgCluster(r, false)
+	cnpgPoolers(r)
+	m, err := lookupURL(t, r, "k://pg-pooler-rw.prod/")
+	if err != nil {
+		t.Fatalf("Lookup error = %v", err)
+	}
+	if last := m.Steps[len(m.Steps)-1]; last.Kind != "CloudNativePG Pooler" || last.Result != resultMatch {
+		t.Errorf("last step = %+v, expected a Pooler match", last)
+	}
+}
+
+func TestDiscoveryRefused(t *testing.T) {
+	t.Parallel()
+	// when api-resources fails, each step asks for itself
+	r := newFake()
+	r.noDiscovery = true
+	cnpgCluster(r, false)
+	if _, err := open(t, r, "k://pg-rw.prod/"); err != nil {
+		t.Fatalf("Open error = %v", err)
+	}
+}
+
+func TestCNPGDatabase(t *testing.T) {
+	t.Parallel()
+	r := newFake()
+	cnpgCluster(r, false)
+	r.add("databases.postgresql.cnpg.io", map[string]any{
+		"metadata": meta("billing", nil),
+		"spec":     map[string]any{"cluster": map[string]any{"name": "pg"}, "name": "billing", "owner": "reporting"},
+	})
+	o, err := open(t, r, "k://billing.prod/")
+	if err != nil {
+		t.Fatalf("Open error = %v", err)
+	}
+	u := localOf(t, o)
+	if u.User.Username() != "reporting" || u.Path != "/billing" || !strings.Contains(r.forwards[0], "service/pg-rw") {
+		t.Errorf("local URL = %s, forward = %q, expected reporting on billing through pg-rw", o.URL, r.forwards[0])
+	}
+}
+
 func TestCNPGPod(t *testing.T) {
 	t.Parallel()
 	r := newFake()
@@ -468,6 +574,8 @@ func TestNotFound(t *testing.T) {
 		"mariadb-operator MariaDB: not installed",
 		"MOCO MySQLCluster: not installed",
 		"OpenEverest DatabaseCluster: not installed",
+		"CloudNativePG Pooler: not installed",
+		"CloudNativePG Database: not installed",
 		"Service: no match",
 		"Helm release: no match",
 		"StatefulSet: no match",

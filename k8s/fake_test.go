@@ -29,6 +29,10 @@ type fakeRunner struct {
 	// forbidden holds the keys that RBAC refuses.
 	forbidden map[string]bool
 
+	// noDiscovery makes kubectl api-resources fail, so that each step asks
+	// for itself.
+	noDiscovery bool
+
 	calls    []string
 	forwards []string
 }
@@ -80,6 +84,19 @@ func (r *fakeRunner) get(_ context.Context, args ...string) ([]byte, error) {
 				"context": map[string]any{"namespace": "default"},
 			}},
 		})
+	}
+	if len(rest) > 0 && rest[0] == "api-resources" {
+		if r.noDiscovery {
+			return nil, dbfwd.ErrForbidden
+		}
+		var b strings.Builder
+		for _, core := range []string{"services", "pods", "secrets", "statefulsets.apps", "deployments.apps"} {
+			b.WriteString(core + "\n")
+		}
+		for res := range r.installed {
+			b.WriteString(res + "\n")
+		}
+		return []byte(b.String()), nil
 	}
 	if len(rest) < 2 || rest[0] != "get" {
 		return nil, dbfwd.ErrUnsupported

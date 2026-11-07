@@ -10,6 +10,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/url"
@@ -104,10 +105,24 @@ func (b backend) find(ctx context.Context, u *dburl.URL, cfg dbfwd.Config) (*loo
 	if req.namespace != "" {
 		namespace = req.namespace
 	}
+	k := &kube{r: r, context: req.context, namespace: namespace}
+	// The first call that reaches the cluster gets the terminal, so that a
+	// credential plugin can prompt. It asks which kinds the cluster has, which
+	// every lookup needs, and which prints nothing when it works.
+	installed, err := k.resources(ctx)
+	switch {
+	case errors.Is(err, dbfwd.ErrUnauthorized), errors.Is(err, dbfwd.ErrNoTool), ctx.Err() != nil:
+		return nil, nil, err
+	case err != nil:
+		// the cluster did not say which kinds it has, so each step asks for
+		// itself
+		installed = nil
+	}
 	l := &lookup{
-		k:     &kube{r: r, context: req.context, namespace: namespace},
-		req:   req,
-		scope: []dbfwd.Field{{Name: "context", Value: context}, {Name: "namespace", Value: namespace}},
+		k:         k,
+		req:       req,
+		scope:     []dbfwd.Field{{Name: "context", Value: context}, {Name: "namespace", Value: namespace}},
+		installed: installed,
 	}
 	f, err := l.run(ctx)
 	if err != nil {

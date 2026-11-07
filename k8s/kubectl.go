@@ -301,6 +301,22 @@ func (k *kube) list(ctx context.Context, resource, selector string) ([]object, e
 	return o.list("items"), nil
 }
 
+// resources returns the resources that the cluster has, by the names that
+// kubectl get takes, such as clusters.postgresql.cnpg.io.
+func (k *kube) resources(ctx context.Context) (map[string]bool, error) {
+	out, err := k.r.get(ctx, k.args("api-resources", "--output", "name")...)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]bool)
+	for line := range strings.Lines(string(out)) {
+		if s := strings.TrimSpace(line); s != "" {
+			m[s] = true
+		}
+	}
+	return m, nil
+}
+
 // secret reads the data of a Secret.
 func (k *kube) secret(ctx context.Context, name string) (map[string]string, error) {
 	o, err := k.get(ctx, "secret", name)
