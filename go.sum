@@ -1,2 +1,6 @@
+github.com/xo/dbmeta v0.35.0 h1:hx6isR4K1u1ykgoE+4hJDE1zuLr/uogMxEiu8QVt5Yg=
+github.com/xo/dbmeta v0.35.0/go.mod h1:MDuDrRxVooo2zNsM8kOFfDrJ7Y0N4998MlaKDEvegk4=
 github.com/xo/dburl v0.57.0 h1:lPaECT64gRES4Gs6pH0Tyi9w6Sg0hSkiNwEhqfkOl3w=
 github.com/xo/dburl v0.57.0/go.mod h1:uazlaAQxj4gkshhfuuYyvwCBouOmNnG2aDxTCFZpmL4=
+github.com/xo/ox v0.0.0-20260927161223-bb2641a91b18 h1:SHUjYUDTmfldf6LY6vzkX8Va9EVHb1k1PZSJ+l6+mYY=
+github.com/xo/ox v0.0.0-20260927161223-bb2641a91b18/go.mod h1:MREUmRj7Fcm+0Gc/UImQNaZoq1nexrj0jkNBdo/ljnY=

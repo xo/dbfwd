@@ -83,6 +83,9 @@ var cnpg = &operator{
 		if owner == "" {
 			owner = db
 		}
+		if pick(role) == roleRO && cr.num("spec", "instances") < 2 {
+			return nil, fmt.Errorf("reaching a replica of the CloudNativePG cluster %s, which has one instance: %w", name, dbfwd.ErrNotFound)
+		}
 		appSecret := cr.str("spec", "bootstrap", "initdb", "secret", "name")
 		if appSecret == "" {
 			appSecret = name + "-app"

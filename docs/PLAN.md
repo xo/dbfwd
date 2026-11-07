@@ -18,10 +18,16 @@ The design is decided, and the first implementation exists:
    lookup chain except step 2, the rules of CloudNativePG, mariadb-operator,
    MOCO and OpenEverest `pxc`, and the pod spec rules for a database with no
    operator.
-3. Unit tests against a fake `kubectl`, and tests of the runner against a
+3. The command `cmd/dbfwd`, with `dbfwd <url>`, `usql`, `forward`, `lookup`
+   and `clients`.
+4. Unit tests against a fake `kubectl`, and tests of the runner against a
    stand-in `kubectl`.
 
-Nothing has run against a real cluster yet.
+The command ran by hand on 2026-11-07 against a kind cluster from `dbrun`,
+with CloudNativePG v1.30.1 and with a StatefulSet of the official `postgres`
+image. `psql` and `usql` connected through the cluster name, the Services
+`pg-rw` and `shop-db`, a Pod, and the Secret form `pg-app:@`. No automated
+test runs against a cluster yet.
 
 | Area | Document | Decisions |
 | --- | --- | --- |
@@ -111,9 +117,7 @@ fake tool and recorded output for the tests (D12).
 2. Check the owner chains of the CloudNativePG `Pooler` and `Database` and the
    mariadb-operator `MaxScale` in the upstream source, then write lookup step
    2.
-3. Write `cmd/dbfwd`. `dbfwd usql` waits for the release of `usql` that reads
-   `USQL_DSN`.
-4. Write a full section in `docs/OPERATORS.md` for each tier 1 operator, then
+3. Write a full section in `docs/OPERATORS.md` for each tier 1 operator, then
    its rules.
 
 ## Open questions

@@ -118,6 +118,7 @@ func (l *lookup) fromOperator(op *operator, cr object, via string) (*found, erro
 	if via != "" {
 		f.forward = "service/" + via
 	}
+	f.target.Kind, f.target.Name = op.kind, cr.name()
 	f.target.Owner = op.name + " " + op.kind + " " + cr.name()
 	return f, nil
 }

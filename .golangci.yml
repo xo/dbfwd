@@ -113,6 +113,9 @@ linters:
         - (*database/sql.DB).Close
         - (*database/sql.Stmt).Close
         - (*github.com/xo/dbfwd.Forward).Close
+        # A failed write to the terminal of the command has no remedy.
+        - fmt.Fprintln
+        - fmt.Fprintf
     errorlint:
       errorf: true
       asserts: true

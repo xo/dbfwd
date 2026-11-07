@@ -9,6 +9,10 @@ support in `usql`. D14 holds the decision.
 The command parses its flags with `github.com/xo/ox`. It can import `dbmeta`
 and `ox`, and the packages that `usql` imports cannot.
 
+Arguments for the client go after `--`, as in
+`dbfwd k+cnpg://pg.prod/ -- -c 'select 1'`. Without `--`, `dbfwd` reads a
+flag of the client as its own.
+
 ## Commands
 
 | Command | What it does |
@@ -17,14 +21,14 @@ and `ox`, and the packages that `usql` imports cannot.
 | `dbfwd usql <url> [-- <args>]` | The same, with `usql` in place of the native client |
 | `dbfwd forward <url>` | Starts the forward and holds it until Ctrl-C. It prints the local address, the user and the database, and never the password |
 | `dbfwd lookup <url>` | Runs the lookup and prints each step and what matched (D7). It reads no Secret and starts no forward, so a person can see why a name did not match |
-| `dbfwd clients` | Lists the client of each database type, and whether it is on the `PATH` |
+| `dbfwd clients` | Lists the client of each database type, and `usql`, and whether each is on the `PATH` |
 
 Flags:
 
 | Flag | What it does |
 | --- | --- |
-| `--client <command>` | Runs another client of the same database, such as `pgcli` in place of `psql` |
-| `--print` | Prints the client command and the names of its environment variables, with the password masked, and runs nothing |
+| `--client <command>` | Runs another client of the same database, such as `pgcli` in place of `psql`. It takes the same arguments. Only `dbfwd <url>` has it |
+| `--print` | Prints the client command and the names of its environment variables, with the password masked, and runs nothing. Only `dbfwd <url>` has it |
 | `--kubeconfig <path>` | Uses that kubeconfig in place of `KUBECONFIG`. It is `WithEnv("KUBECONFIG", path)` |
 | `--kubectl <path>` | Runs that `kubectl`. It is `WithTool("kubectl", path)` |
 

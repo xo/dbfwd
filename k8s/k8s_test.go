@@ -18,6 +18,7 @@ func cnpgCluster(r *fakeRunner, superuser bool) {
 	r.add("clusters.postgresql.cnpg.io", map[string]any{
 		"metadata": meta("pg", nil),
 		"spec": map[string]any{
+			"instances":             2,
 			"enableSuperuserAccess": superuser,
 			"managed": map[string]any{"roles": []any{
 				map[string]any{"name": "reporting", "passwordSecret": map[string]any{"name": "pg-reporting"}},
@@ -109,12 +110,12 @@ func TestCNPGCluster(t *testing.T) {
 	if u.Query().Get("sslmode") != "disable" || u.Query().Has("context") {
 		t.Errorf("local query = %q, expected only sslmode", u.RawQuery)
 	}
-	if want := "--namespace prod port-forward --address 127.0.0.1 service/pg-rw :5432"; r.forwards[0] != want {
+	if want := "--namespace prod port-forward --address 127.0.0.1 --pod-running-timeout 20s service/pg-rw :5432"; r.forwards[0] != want {
 		t.Errorf("forward = %q, expected %q", r.forwards[0], want)
 	}
 	want := "Cluster pg in context kind-test, namespace prod, owned by CloudNativePG Cluster pg"
-	if o.Target.Owner != "CloudNativePG Cluster pg" || o.Target.Type != "postgres" || o.Target.Backend != "k8s" {
-		t.Errorf("target = %+v, expected %s", o.Target, want)
+	if got := o.Target.String(); got != want || o.Target.Type != "postgres" || o.Target.Backend != "k8s" {
+		t.Errorf("target = %q, expected %q", got, want)
 	}
 }
 
@@ -135,6 +136,18 @@ func TestCNPGService(t *testing.T) {
 	_, err = open(t, r, "k://pg-ro.prod/?role=rw")
 	if !errors.Is(err, dbfwd.ErrRoleConflict) {
 		t.Errorf("Open with role=rw on pg-ro error = %v, expected %v", err, dbfwd.ErrRoleConflict)
+	}
+}
+
+func TestCNPGOneInstanceHasNoReplica(t *testing.T) {
+	t.Parallel()
+	r := newFake()
+	r.add("clusters.postgresql.cnpg.io", map[string]any{
+		"metadata": meta("solo", nil),
+		"spec":     map[string]any{"instances": 1},
+	})
+	if _, err := open(t, r, "k+cnpg://solo.prod/?role=ro"); !errors.Is(err, dbfwd.ErrNotFound) {
+		t.Errorf("Open with role=ro error = %v, expected %v", err, dbfwd.ErrNotFound)
 	}
 }
 

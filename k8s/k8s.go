@@ -23,6 +23,11 @@ import (
 // name is the name of the backend and of its scheme.
 const name = "k8s"
 
+// podTimeout is how long kubectl port-forward waits for a running pod. A
+// Service with no ready pod, such as the replicas of a cluster with one
+// instance, then fails in this time rather than in a minute.
+const podTimeout = "20s"
+
 func init() {
 	dbfwd.Register(name, backend{newRunner: func(cfg dbfwd.Config) runner { return newExecRunner(cfg) }})
 }
@@ -72,7 +77,7 @@ func (b backend) Open(ctx context.Context, u *dburl.URL, cfg dbfwd.Config) (*dbf
 	if req.port != 0 {
 		port = req.port
 	}
-	t, err := k.r.forward(ctx, k.args("port-forward", "--address", "127.0.0.1", f.forward, ":"+strconv.Itoa(port))...)
+	t, err := k.r.forward(ctx, k.args("port-forward", "--address", "127.0.0.1", "--pod-running-timeout", podTimeout, f.forward, ":"+strconv.Itoa(port))...)
 	if err != nil {
 		return nil, fmt.Errorf("forwarding to %s: %w", f.target, err)
 	}
