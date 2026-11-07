@@ -282,3 +282,50 @@ func TestParseScope(t *testing.T) {
 		})
 	}
 }
+
+func TestListURL(t *testing.T) {
+	t.Parallel()
+	ns := func(v string) dbfwd.Field { return dbfwd.Field{Name: "namespace", Value: v} }
+	kc := func(v string) dbfwd.Field { return dbfwd.Field{Name: "context", Value: v} }
+	tests := []struct {
+		scope string
+		where []dbfwd.Field
+		want  string
+		bad   bool
+	}{
+		{scope: "", want: "k://*"},
+		{scope: "*", want: "k://*"},
+		{scope: "pg*.prod", want: "k://pg*.prod"},
+		{scope: "cnpg://*", want: "k+cnpg://*"},
+		{scope: "pg://*.prod", want: "k+pg://*.prod"},
+		{scope: "k+cnpg://*", want: "k+cnpg://*"},
+		{scope: "kube://pg.prod/", want: "kube://pg.prod/"},
+		{scope: "", where: []dbfwd.Field{ns("*")}, want: "k://*.*"},
+		{scope: "pg*", where: []dbfwd.Field{ns("prod")}, want: "k://pg*.prod"},
+		{scope: "*.prod", where: []dbfwd.Field{ns("prod")}, want: "k://*.prod"},
+		{scope: "", where: []dbfwd.Field{kc("kind-x")}, want: "k://*?context=kind-x"},
+		{scope: "cnpg://*", where: []dbfwd.Field{ns("prod"), kc("kind-x")}, want: "k+cnpg://*.prod?context=kind-x"},
+		{scope: "*.prod", where: []dbfwd.Field{ns("dev")}, bad: true},
+		{scope: "*.prod", where: []dbfwd.Field{ns("*")}, bad: true},
+		{scope: "*?context=a", where: []dbfwd.Field{kc("b")}, bad: true},
+		{scope: "*", where: []dbfwd.Field{{Name: "role", Value: "ro"}}, bad: true},
+	}
+	for _, test := range tests {
+		t.Run(test.scope, func(t *testing.T) {
+			t.Parallel()
+			got, err := backend{}.ListURL(test.scope, test.where)
+			if test.bad {
+				if !errors.Is(err, dbfwd.ErrBadURL) {
+					t.Fatalf("error = %v, expected %v", err, dbfwd.ErrBadURL)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("error = %v", err)
+			}
+			if got != test.want {
+				t.Errorf("ListURL = %q, expected %q", got, test.want)
+			}
+		})
+	}
+}

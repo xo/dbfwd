@@ -22,11 +22,7 @@ func list(ctx context.Context, args []string) error {
 	if len(args) != 0 {
 		arg = args[0]
 	}
-	raw, err := scopeURL(arg, otx.Bool(ctx, "all-namespaces"), otx.String(ctx, "namespace"), otx.String(ctx, "context"))
-	if err != nil {
-		return err
-	}
-	u, err := parseURL(raw)
+	u, err := listURL(arg, otx.Bool(ctx, "all-namespaces"), otx.String(ctx, "namespace"), otx.String(ctx, "context"))
 	if err != nil {
 		return err
 	}
@@ -38,65 +34,23 @@ func list(ctx context.Context, args []string) error {
 	return nil
 }
 
-// scopeURL builds the URL of a listing from the scope argument and the flags.
-// The k:// is optional: * becomes k://*, and cnpg://* becomes k+cnpg://*. A
-// URL whose scheme is already k8s, such as kube:// or k+cnpg://, stays as it
-// is. A flag that disagrees with the URL is an error.
-func scopeURL(arg string, all bool, namespace, kubeContext string) (string, error) {
-	switch {
-	case arg == "":
-		arg = "k://*"
-	case !strings.Contains(arg, "://"):
-		arg = "k://" + arg
-	default:
-		if u, err := dburl.Parse(arg); err != nil || u.SchemeName != "k8s" {
-			arg = "k+" + arg
-		}
-	}
+// listURL builds the URL of a listing from the scope argument and the flags,
+// with dbfwd.ListURL, which the \k command of usql calls too.
+func listURL(arg string, all bool, namespace, kubeContext string) (*dburl.URL, error) {
 	if all && namespace != "" {
-		return "", fmt.Errorf("listing with -A and -n %s, which disagree: %w", namespace, dbfwd.ErrBadURL)
+		return nil, fmt.Errorf("listing with -A and -n %s, which disagree: %w", namespace, dbfwd.ErrBadURL)
 	}
-	u, err := dburl.Parse(arg)
-	if err != nil {
-		return "", fmt.Errorf("reading the scope: %w", dbfwd.ErrBadURL)
-	}
-	// the host splits at its last dot, as for Resolve
-	name, ns, ok := strings.CutLast(u.Host, ".")
-	if !ok {
-		name, ns = u.Host, ""
-	}
-	want := namespace
 	if all {
-		want = "*"
+		namespace = "*"
 	}
-	switch {
-	case want == "":
-	case ns != "" && ns != want:
-		return "", fmt.Errorf("listing the namespace %s, which the flags give as %s: %w", ns, want, dbfwd.ErrBadURL)
-	default:
-		ns = want
+	var where []dbfwd.Field
+	if namespace != "" {
+		where = append(where, dbfwd.Field{Name: "namespace", Value: namespace})
 	}
-	host := name
-	if ns != "" {
-		host += "." + ns
-	}
-	query := u.RawQuery
 	if kubeContext != "" {
-		q := u.Query()
-		if c := q.Get("context"); c != "" && c != kubeContext {
-			return "", fmt.Errorf("listing in the context %s, which the flags give as %s: %w", c, kubeContext, dbfwd.ErrBadURL)
-		}
-		q.Set("context", kubeContext)
-		query = q.Encode()
+		where = append(where, dbfwd.Field{Name: "context", Value: kubeContext})
 	}
-	// the scheme stays as it was written, because dburl drops the part after
-	// the + from the URL it rebuilds
-	scheme, _, _ := strings.Cut(arg, "://")
-	out := scheme + "://" + host + u.Path
-	if query != "" {
-		out += "?" + query
-	}
-	return out, nil
+	return dbfwd.ListURL("k8s", arg, where...)
 }
 
 // printListing prints one row for each entry, and then what the listing

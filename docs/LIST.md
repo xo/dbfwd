@@ -238,17 +238,42 @@ says.
 `cmd/dbfwd` gets `dbfwd list`, which calls the same `List`:
 
 ```text
-dbfwd list [-A | -n NAMESPACE] [--context NAME] [PATTERN]
+dbfwd list [-A | -n NAMESPACE] [--context NAME] [-w] [SCOPE]
 ```
 
 The flags follow `kubectl`: `-A` is every namespace, `-n` is one namespace,
-and `--context` is a context. `PATTERN` is a name with `*`, and the command
-builds the URL from the flags, such as `k://pg*.prod?context=x` from
-`-n prod --context x pg*`. It prints one row for each entry, then each
+and `--context` is a context. It prints one row for each entry, then each
 `Skipped` part, to standard error.
 
-`usql` can build the URL in the same way for `\k`, so the flags of the two
-commands mean the same thing.
+## Building the URL from what a person typed
+
+`ListURL` turns a scope that a person typed, and the flags that edit it, into
+the URL of a listing. `dbfwd list` and the `\k` command of `usql` both call
+it, so the two read a scope in the same way, and `usql` parses no URL of its
+own.
+
+```go
+// ListURL builds the URL of a listing for the backend, such as "k8s", from
+// a scope that a person typed and the fields that edit it.
+func ListURL(backend, scope string, where ...Field) (*dburl.URL, error)
+```
+
+The root package names no Kubernetes term. It hands the scope and the fields
+to the backend, through the method `ListURL` of `Lister`, and parses what the
+backend returns. The k8s backend reads them in this way:
+
+1. The `k://` is optional. `*` is `k://*`, `pg*.prod` is `k://pg*.prod`, and
+   `cnpg://*` is `k+cnpg://*`. A scope whose scheme is already `k8s`, such as
+   `kube://` or `k+cnpg://`, stays as it is. An empty scope is `k://*`.
+2. The field `namespace` sets the namespace, and `*` is every namespace. The
+   field `context` sets `?context=`. Any other field is an error.
+3. A field that disagrees with the scope, such as the namespace `dev` with
+   `*.prod`, is an error that wraps `ErrBadURL`.
+
+A caller turns its flags into fields. `-A` with `-n` is the one conflict that
+the caller checks, because both are flags. `dbfwd list -n prod --context x
+pg*` calls `ListURL("k8s", "pg*", Field{"namespace", "prod"},
+Field{"context", "x"})`, which returns `k://pg*.prod?context=x`.
 
 ## Testing
 

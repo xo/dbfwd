@@ -9,36 +9,30 @@ import (
 	"github.com/xo/dbfwd"
 )
 
-func TestScopeURL(t *testing.T) {
+func TestListURL(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		arg       string
 		all       bool
 		namespace string
 		context   string
-		want      string
+		transport string
+		host      string
+		query     string
 		bad       bool
 	}{
-		{arg: "", want: "k://*"},
-		{arg: "*", want: "k://*"},
-		{arg: "pg*.prod", want: "k://pg*.prod"},
-		{arg: "cnpg://*", want: "k+cnpg://*"},
-		{arg: "pg://*.prod", want: "k+pg://*.prod"},
-		{arg: "k+cnpg://*", want: "k+cnpg://*"},
-		{arg: "kube://pg.prod/", want: "kube://pg.prod/"},
-		{arg: "", all: true, want: "k://*.*"},
-		{arg: "pg*", namespace: "prod", want: "k://pg*.prod"},
-		{arg: "*.prod", namespace: "prod", want: "k://*.prod"},
-		{arg: "", context: "kind-x", want: "k://*?context=kind-x"},
-		{arg: "*.prod", namespace: "dev", bad: true},
-		{arg: "*.prod", all: true, bad: true},
+		{arg: "", host: "*"},
+		{arg: "cnpg://pg*", transport: "cnpg", host: "pg*"},
+		{arg: "", all: true, host: "*.*"},
+		{arg: "pg*", namespace: "prod", host: "pg*.prod"},
+		{arg: "", context: "kind-x", host: "*", query: "context=kind-x"},
 		{arg: "", all: true, namespace: "prod", bad: true},
-		{arg: "*?context=a", context: "b", bad: true},
+		{arg: "*.prod", all: true, bad: true},
 	}
 	for _, test := range tests {
 		t.Run(test.arg, func(t *testing.T) {
 			t.Parallel()
-			got, err := scopeURL(test.arg, test.all, test.namespace, test.context)
+			u, err := listURL(test.arg, test.all, test.namespace, test.context)
 			if test.bad {
 				if !errors.Is(err, dbfwd.ErrBadURL) {
 					t.Fatalf("error = %v, expected %v", err, dbfwd.ErrBadURL)
@@ -48,8 +42,8 @@ func TestScopeURL(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error = %v", err)
 			}
-			if got != test.want {
-				t.Errorf("scopeURL = %q, expected %q", got, test.want)
+			if u.SchemeName != "k8s" || u.Transport != test.transport || u.Host != test.host || u.RawQuery != test.query {
+				t.Errorf("URL = %s %q %q %q, expected k8s %q %q %q", u.SchemeName, u.Transport, u.Host, u.RawQuery, test.transport, test.host, test.query)
 			}
 		})
 	}

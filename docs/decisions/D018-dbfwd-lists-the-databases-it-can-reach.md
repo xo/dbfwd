@@ -1,6 +1,9 @@
 # D18. dbfwd lists the databases it can reach
 
-Status: Proposed. Amends D10 once decided.
+Status: Decided. Amends D10.
+
+Ken decided on 2026-11-08 that `dbfwd` lists the databases it can reach, as
+`docs/LIST.md` describes.
 
 `usql` asks for a meta command, such as `\k`, that lists the databases in a
 cluster with the URL to pass to `\c`. `docs/LIST.md` holds the design.
@@ -23,6 +26,11 @@ cluster with the URL to pass to `\c`. `docs/LIST.md` holds the design.
    listing fails with `ErrForbidden`. This amends D10.
 7. `cmd/dbfwd` gets `dbfwd list`, with the flags of `kubectl`, on the same
    function.
+8. `ListURL(backend, scope, where...)` builds the URL of a listing from a
+   scope that a person typed and the fields that edit it, such as the
+   namespace and the context. The backend owns the rules, so the root names
+   no Kubernetes term. `dbfwd list` and the `\k` command of `usql` both call
+   it. Ken chose this form on 2026-11-08.
 
 Rejected:
 
@@ -35,3 +43,6 @@ Rejected:
 5. Listing the current namespace when every namespace is forbidden, which
    lists a scope that the user did not ask for.
 6. An operator field on `Target`, which `Resolve` and `Lookup` also return.
+7. `ScopeURL(scope, all, namespace, context)` in the root package, which
+   names Kubernetes terms there.
+8. A copy of the scope rules in `usql`, which parses no URL of its own.

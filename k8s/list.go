@@ -139,6 +139,73 @@ func (b backend) List(ctx context.Context, u *dburl.URL, cfg dbfwd.Config) (*dbf
 	return listing, nil
 }
 
+// ListURL builds the URL of a listing from a scope and the fields that edit
+// it (docs/LIST.md). The k:// is optional: * is k://*, and cnpg://* is
+// k+cnpg://*. A scope whose scheme is already k8s, such as kube:// or
+// k+cnpg://, stays as it is. The fields are "namespace", which is "*" for
+// every namespace, and "context". A field that disagrees with the scope is an
+// error.
+func (backend) ListURL(scope string, where []dbfwd.Field) (string, error) {
+	var namespace, kubeContext string
+	for _, f := range where {
+		switch f.Name {
+		case "namespace":
+			namespace = f.Value
+		case keyContext:
+			kubeContext = f.Value
+		default:
+			return "", fmt.Errorf("reading the field %q of a listing, which is namespace or context: %w", f.Name, dbfwd.ErrBadURL)
+		}
+	}
+	switch {
+	case scope == "":
+		scope = "k://*"
+	case !strings.Contains(scope, "://"):
+		scope = "k://" + scope
+	default:
+		if u, err := dburl.Parse(scope); err != nil || u.SchemeName != name {
+			scope = "k+" + scope
+		}
+	}
+	u, err := dburl.Parse(scope)
+	if err != nil {
+		return "", fmt.Errorf("reading the scope: %w", dbfwd.ErrBadURL)
+	}
+	// the host splits at its last dot, as for Resolve
+	pattern, ns, ok := strings.CutLast(u.Host, ".")
+	if !ok {
+		pattern, ns = u.Host, ""
+	}
+	switch {
+	case namespace == "":
+	case ns != "" && ns != namespace:
+		return "", fmt.Errorf("listing the namespace %s, which the flags give as %s: %w", ns, namespace, dbfwd.ErrBadURL)
+	default:
+		ns = namespace
+	}
+	host := pattern
+	if ns != "" {
+		host += "." + ns
+	}
+	query := u.RawQuery
+	if kubeContext != "" {
+		q := u.Query()
+		if c := q.Get(keyContext); c != "" && c != kubeContext {
+			return "", fmt.Errorf("listing in the context %s, which the flags give as %s: %w", c, kubeContext, dbfwd.ErrBadURL)
+		}
+		q.Set(keyContext, kubeContext)
+		query = q.Encode()
+	}
+	// the scheme stays as it was written, because dburl drops the part after
+	// the + from the URL it rebuilds
+	scheme, _, _ := strings.Cut(scope, "://")
+	out := scheme + "://" + host + u.Path
+	if query != "" {
+		out += "?" + query
+	}
+	return out, nil
+}
+
 // matches reports whether an entry fits the name and the type of the scope.
 func (s scope) matches(e dbfwd.Entry) bool {
 	if ok, _ := path.Match(s.pattern, e.Target.Name); !ok {

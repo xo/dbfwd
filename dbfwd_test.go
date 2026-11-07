@@ -308,4 +308,10 @@ func TestListUnsupported(t *testing.T) {
 	if _, err := dbfwd.List(t.Context(), &dburl.URL{SchemeName: "nope"}); !errors.Is(err, dbfwd.ErrNoBackend) {
 		t.Errorf("List error = %v, expected %v", err, dbfwd.ErrNoBackend)
 	}
+	if _, err := dbfwd.ListURL("fake", "*"); !errors.Is(err, dbfwd.ErrUnsupported) {
+		t.Errorf("ListURL error = %v, expected %v", err, dbfwd.ErrUnsupported)
+	}
+	if _, err := dbfwd.ListURL("nope", "*"); !errors.Is(err, dbfwd.ErrNoBackend) {
+		t.Errorf("ListURL error = %v, expected %v", err, dbfwd.ErrNoBackend)
+	}
 }

@@ -42,8 +42,9 @@ Each flag becomes an option of `Resolve` (D11, `docs/API.md`).
 
 The flags of `dbfwd list` follow `kubectl`, and edit the listing URL: `-n
 prod --context x pg*` is `k://pg*.prod?context=x`. A flag that disagrees
-with the URL is an error, such as `-n dev` with `*.prod`. `usql` builds the
-URL of `\k` in the same way.
+with the URL is an error, such as `-n dev` with `*.prod`. The command builds
+the URL with `dbfwd.ListURL`, and the `\k` command of `usql` calls the same
+function (`docs/LIST.md`).
 
 ## The password
 

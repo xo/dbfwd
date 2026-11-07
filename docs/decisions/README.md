@@ -29,4 +29,4 @@ Read the status before the decision.
 | [D15](D015-the-go-api.md) | The Go API | Decided |
 | [D16](D016-dbfwd-watches-the-target-and-reconnects.md) | dbfwd watches the target and reconnects | Decided |
 | [D17](D017-kubectl-dies-with-its-parent.md) | kubectl dies with its parent | Decided |
-| [D18](D018-dbfwd-lists-the-databases-it-can-reach.md) | dbfwd lists the databases it can reach | Proposed |
+| [D18](D018-dbfwd-lists-the-databases-it-can-reach.md) | dbfwd lists the databases it can reach | Decided |

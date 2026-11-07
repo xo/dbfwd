@@ -11,6 +11,10 @@ import (
 type Lister interface {
 	// List lists the databases that u names.
 	List(ctx context.Context, u *dburl.URL, cfg Config) (*Listing, error)
+
+	// ListURL builds the URL of a listing from a scope and the fields that
+	// edit it. It returns the URL as a string for dburl.Parse.
+	ListURL(scope string, where []Field) (string, error)
 }
 
 // Listing is what List found.
@@ -84,4 +88,31 @@ func List(ctx context.Context, u *dburl.URL, opts ...Option) (*Listing, error) {
 		return nil, fmt.Errorf("listing the databases of %s: %w", u.SchemeName, ErrUnsupported)
 	}
 	return l.List(ctx, u, newConfig(opts))
+}
+
+// ListURL builds the URL of a listing for the backend, such as "k8s", from a
+// scope that a person typed and the fields that edit it, so that every caller
+// reads a scope in the same way. The backend owns the rules, and
+// docs/LIST.md holds them. A field that disagrees with the scope is an error
+// that wraps ErrBadURL.
+func ListURL(backend, scope string, where ...Field) (*dburl.URL, error) {
+	registry.RLock()
+	b, ok := registry.backends[backend]
+	registry.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("finding a backend for %q: %w", backend, ErrNoBackend)
+	}
+	l, ok := b.(Lister)
+	if !ok {
+		return nil, fmt.Errorf("listing the databases of %s: %w", backend, ErrUnsupported)
+	}
+	raw, err := l.ListURL(scope, where)
+	if err != nil {
+		return nil, err
+	}
+	u, err := dburl.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("reading the scope: %w", ErrBadURL)
+	}
+	return u, nil
 }

@@ -114,7 +114,5 @@ fake tool and recorded output for the tests (D12).
 
 Ask Ken. Do not answer one on your own.
 
-1. D18, the listing of the databases of a cluster, is built as
-   `docs/LIST.md` describes, and is still Proposed. Ken decides whether it is
-   Decided.
+None is open now.
 

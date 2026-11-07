@@ -400,11 +400,20 @@ reads and what RBAC it needs.
 // k://pg*.prod. It reads no credential and starts no forward.
 func List(ctx context.Context, u *dburl.URL, opts ...Option) (*Listing, error)
 
+// ListURL builds the URL of a listing for the backend, such as "k8s", from
+// a scope that a person typed and the fields that edit it.
+func ListURL(backend, scope string, where ...Field) (*dburl.URL, error)
+
 // Lister is a Backend that can list its databases.
 type Lister interface {
 	List(ctx context.Context, u *dburl.URL, cfg Config) (*Listing, error)
+	ListURL(scope string, where []Field) (string, error)
 }
 ```
+
+`ListURL` lets `usql` and `dbfwd list` read a scope that a person typed in the
+same way, such as `cnpg://*` with the field `namespace` set to `prod`. The
+backend owns the rules, so the root package names no Kubernetes term.
 
 `Listing` holds the scope that `List` resolved, one `Entry` for each
 database, and a `Skip` for each kind that RBAC hid. An `Entry` holds the
