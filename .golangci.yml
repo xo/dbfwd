@@ -1,0 +1,144 @@
+# Lint configuration.
+#
+# A linter that makes idiomatic Go worse is disabled here, with the reason
+# written beside it. Only a real defect gets a code change. A change made to
+# quiet a linter, rather than to fix something, is itself the defect.
+#
+# The posture is `default: all` with a disable list. A new linter arriving in
+# a release gets a look rather than silence. The version in CI is pinned.
+version: "2"
+
+run:
+  modules-download-mode: readonly
+
+linters:
+  default: all
+  disable:
+    # Deliberate patterns. Package level values and init functions are
+    # allowed where a registry needs them.
+    - gochecknoinits
+    - gochecknoglobals
+    # Repeated strings in a table of cases read better than a constant each.
+    - goconst
+    - dupword
+    - lll
+    - wsl
+    - wsl_v5
+    # Complexity metrics. A long table is not a complex function, and these
+    # count it as one.
+    - cyclop
+    - funlen
+    - gocognit
+    - gocyclo
+    - maintidx
+    - nestif
+    # err113 wants every error to be a wrapped sentinel and flags the
+    # fmt.Errorf calls that carry %w. The rule here is stricter than err113
+    # and different in kind: a sentinel is a constant of type Error, which
+    # err113 does not know how to check.
+    - err113
+    # wrapcheck wants every error that crosses a package wrapped, which hides
+    # the identity a caller tests with errors.Is.
+    - wrapcheck
+    # Style opinions that argue with gofmt or with plain code.
+    - nlreturn
+    - varnamelen
+    - exhaustruct
+    - mnd
+    - nilnil
+    - ireturn
+    - nonamedreturns
+    # prealloc rewrites readable loops for a gain nothing has measured here.
+    - prealloc
+    # depguard holds the dependency rule, and holding it twice means two
+    # places to change it. gomodguard is deprecated on top of that.
+    - gomodguard
+    - gomodguard_v2
+    # A test that opens a connection is deliberately not parallel.
+    - paralleltest
+    # noinlineerr bans `if err := f(); err != nil`, which is the form the Go
+    # standard library uses and gofmt is built around.
+    - noinlineerr
+    # exhaustive fires on two switches that handle two of three values and
+    # answer the third after the switch. Its remedy is an empty case with no
+    # body, which says less than the code already does.
+    - exhaustive
+  settings:
+    # Hard rule 1. The packages that usql imports use the standard library and
+    # dburl and nothing else. This is what stops a dependency appearing by
+    # accident.
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          files:
+            - $all
+            - "!**/cmd/**"
+          allow:
+            - $gostd
+            - github.com/xo/dbfwd
+            - github.com/xo/dburl
+        # D18. The command, which usql never imports, can also use dbmeta for
+        # the table of native clients and ox for its flags.
+        cmd:
+          list-mode: strict
+          files:
+            - "**/cmd/**"
+          allow:
+            - $gostd
+            - github.com/xo/dbfwd
+            - github.com/xo/dburl
+            - github.com/xo/dbmeta
+            - github.com/xo/ox
+    # Hard rules 8 and the database/sql half of the Go conventions.
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^context\.(Background|TODO)$
+          msg: take the context from the caller, never make one here
+        - pattern: ^\(\*database/sql\.(DB|Conn|Tx|Stmt)\)\.(Query|Exec|QueryRow|Prepare)$
+          msg: use the Context form, such as QueryContext
+    # A deferred Close returns an error nothing can act on, and the one that
+    # matters was already reported by Err. Wrapping the defer in a closure to
+    # discard it reads worse than the call it replaces.
+    errcheck:
+      exclude-functions:
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Stmt).Close
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    gocritic:
+      disabled-checks:
+        - exitAfterDefer
+    revive:
+      rules:
+        - name: context-as-argument
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: indent-error-flow
+        - name: package-comments
+        - name: receiver-naming
+        - name: var-naming
+  exclusions:
+    rules:
+      # A test does not answer to the context rule.
+      - path: _test\.go
+        linters:
+          - dupl
+          - forbidigo
+          # a test is not the attack surface that gosec looks for
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/xo/dbfwd

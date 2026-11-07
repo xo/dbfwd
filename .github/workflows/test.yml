@@ -1,0 +1,57 @@
+# Tests dbfwd on every push and pull request.
+#
+# One job on one runner. The code is pure Go and has no build constraint on an
+# operating system or an architecture.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Lint
+        # Pinned. The configuration is `default: all`, so an unpinned upgrade
+        # enables a new linter and fails a build that changed nothing.
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.1
+
+      - name: Check formatting
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "these files are not formatted:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test -race -count=2 ./...
+
+      - name: Build without cgo
+        run: CGO_ENABLED=0 go build ./...

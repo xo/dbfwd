@@ -1,0 +1,11 @@
+# Everything this repository ignores, in one file.
+#
+# There is one .gitignore and it is this one. A second file in a subdirectory
+# is a rule nobody can audit.
+
+# The Claude Code permissions of one person. The shared .claude/settings.json
+# is not ignored, because a setting that belongs to the project is committed.
+.claude/settings.local.json
+
+# Claude Code worktrees.
+.claude/worktrees/
