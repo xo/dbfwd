@@ -1,0 +1,10 @@
+{
+  "url": "k://shop-haproxy.dbfwd-pxc/?context=CONTEXT",
+  "namespace": "dbfwd-pxc",
+  "user": "root",
+  "database": "",
+  "kind": "Service",
+  "name": "shop-haproxy",
+  "owner": "Percona XtraDB Cluster PerconaXtraDBCluster shop",
+  "type": "mysql"
+}

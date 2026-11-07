@@ -1,0 +1,9 @@
+{
+  "url": "k://mariadbfile.dbfwd-images/?context=CONTEXT",
+  "namespace": "dbfwd-images",
+  "user": "root",
+  "database": "shop",
+  "kind": "StatefulSet",
+  "name": "mariadbfile",
+  "type": "mariadb"
+}

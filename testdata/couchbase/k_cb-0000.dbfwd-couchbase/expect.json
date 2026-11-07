@@ -1,0 +1,10 @@
+{
+  "url": "k://cb-0000.dbfwd-couchbase/?context=CONTEXT",
+  "namespace": "dbfwd-couchbase",
+  "user": "Administrator",
+  "database": "",
+  "kind": "Service",
+  "name": "cb-0000",
+  "owner": "Couchbase Operator CouchbaseCluster cb",
+  "type": "couchbase"
+}

@@ -1,0 +1,10 @@
+{
+  "url": "k://pg-pooler-rw-7564984775-xcxqz.dbfwd-cnpg/?context=CONTEXT",
+  "namespace": "dbfwd-cnpg",
+  "user": "app",
+  "database": "app",
+  "kind": "Pod",
+  "name": "pg-pooler-rw-7564984775-xcxqz",
+  "owner": "CloudNativePG Cluster pg",
+  "type": "postgres"
+}

@@ -1,0 +1,10 @@
+{
+  "url": "k://ha-secondary.dbfwd-mariadb/?context=CONTEXT",
+  "namespace": "dbfwd-mariadb",
+  "user": "shop",
+  "database": "shop",
+  "kind": "Service",
+  "name": "ha-secondary",
+  "owner": "mariadb-operator MariaDB ha",
+  "type": "mariadb"
+}

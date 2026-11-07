@@ -1,0 +1,10 @@
+{
+  "url": "k://adb-sngl-tthxbfvm-879d9f.dbfwd-arangodb/?context=CONTEXT",
+  "namespace": "dbfwd-arangodb",
+  "user": "root",
+  "database": "",
+  "kind": "Pod",
+  "name": "adb-sngl-tthxbfvm-879d9f",
+  "owner": "kube-arangodb ArangoDeployment adb",
+  "type": "arangodb"
+}

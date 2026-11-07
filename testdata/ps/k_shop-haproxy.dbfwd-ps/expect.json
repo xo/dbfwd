@@ -1,0 +1,10 @@
+{
+  "url": "k://shop-haproxy.dbfwd-ps/?context=CONTEXT",
+  "namespace": "dbfwd-ps",
+  "user": "root",
+  "database": "",
+  "kind": "Service",
+  "name": "shop-haproxy",
+  "owner": "Percona Server for MySQL PerconaServerMySQL shop",
+  "type": "mysql"
+}

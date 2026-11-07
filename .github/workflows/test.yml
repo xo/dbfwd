@@ -1,7 +1,12 @@
-# Tests dbfwd on every push and pull request.
+# Tests dbfwd on every push and pull request, and every operator at night.
 #
-# One job on one runner. The code is pure Go and has no build constraint on an
-# operating system or an architecture.
+# The unit job needs no cluster. It runs the unit tests and the replay tests,
+# which feed dbfwd the kubectl output that the cluster tests recorded (D12).
+#
+# The cluster jobs run the test module against a kind cluster that dbrun, in
+# dbmeta, starts under docker (D13). Each job runs one suite in a cluster of
+# its own, so that a heavy operator cannot starve another. The light suites run
+# on every push, and every suite runs at night.
 name: Test
 
 on:
@@ -9,14 +14,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # every night, for every suite
+    - cron: "41 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  # the release of dbmeta whose dbrun starts the kind cluster
+  DBMETA_REF: v0.35.2
+  # the Kubernetes release of the cluster
+  K8S_RELEASE: k8s-1.37
+
 jobs:
-  test:
-    name: Test
+  unit:
+    name: Unit
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -35,6 +49,12 @@ jobs:
         with:
           version: v2.13.1
 
+      - name: Lint the test module
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.1
+          working-directory: test
+
       - name: Check formatting
         run: |
           out=$(gofmt -l .)
@@ -45,13 +65,96 @@ jobs:
           fi
 
       - name: Vet
-        run: go vet ./...
+        run: go vet ./... && (cd test && go vet ./...)
 
       - name: Build
-        run: go build ./...
+        run: go build ./... && CGO_ENABLED=0 go build ./...
 
       - name: Test
         run: go test -race -count=2 ./...
 
-      - name: Build without cgo
-        run: CGO_ENABLED=0 go build ./...
+  cluster:
+    name: Cluster ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    needs: unit
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        # the suites that start in a few minutes on a standard runner
+        suite:
+          - TestCNPG|TestLeastRBAC
+          - TestMariaDBOperator
+          - TestMOCO
+          - TestZalando
+          - TestCrunchyPGO
+          - TestOfficialImages|TestReconnect
+          - TestBitnamiPostgres
+          - TestAltinityClickHouse
+    steps: &cluster-steps
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Check out dbmeta
+        uses: actions/checkout@v5
+        with:
+          repository: xo/dbmeta
+          ref: ${{ env.DBMETA_REF }}
+          path: dbmeta
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Install kind
+        run: go install sigs.k8s.io/kind@v0.33.0
+
+      - name: Start the cluster
+        env:
+          DBMETA_RUNNER: docker
+          DBMETA_OWNER_NAME: ci
+        run: |
+          cd dbmeta/test
+          go run ./cmd/dbrun start "$K8S_RELEASE"
+          go run ./cmd/dbrun dsn --json "$K8S_RELEASE" > "$RUNNER_TEMP/cluster.json"
+          echo "DBFWD_TEST_KUBECONFIG=$(jq -r '.[0].kubeconfig' "$RUNNER_TEMP/cluster.json")" >> "$GITHUB_ENV"
+          echo "DBFWD_TEST_CONTEXT=$(jq -r '.[0].context' "$RUNNER_TEMP/cluster.json")" >> "$GITHUB_ENV"
+
+      - name: Test
+        working-directory: test
+        run: go test -count=1 -timeout 60m -run '^(${{ matrix.suite }})$' -v .
+
+  nightly:
+    name: Nightly ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - TestCNPG|TestLeastRBAC
+          - TestMariaDBOperator
+          - TestMOCO
+          - TestZalando
+          - TestCrunchyPGO
+          - TestStackGres
+          - TestOracleMySQLOperator
+          - TestPerconaXtraDB
+          - TestPerconaServer
+          - TestTiDB
+          - TestVitess
+          - TestECK
+          - TestOpenSearch
+          - TestSolr
+          - TestAltinityClickHouse
+          - TestCassOperator
+          - TestScylla
+          - TestArangoDB
+          - TestCrateDB
+          - TestCouchbase
+          - TestOpenEverest
+          - TestOfficialImages|TestReconnect
+          - TestBitnamiPostgres
+    steps: *cluster-steps

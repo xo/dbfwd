@@ -121,7 +121,8 @@ type Forward struct {
 func (f *Forward) URL(ctx context.Context) (*dburl.URL, error)
 
 // Done returns a channel that is closed when the forward stops, by Close or
-// because it was lost.
+// because it was lost. A pod that goes does not close it while the forward
+// can reconnect (D16).
 func (f *Forward) Done() <-chan struct{}
 
 // Err returns nil while the forward runs and after Close. It returns why the
@@ -168,6 +169,12 @@ driver that the caller does not register.
 
 `Err` returns nil after `Close`, so a caller tells a lost forward from a
 closed one.
+
+A `Forward` watches the pod that it forwards to. When the pod goes, stops
+being ready, or loses its role after a failover, the `Forward` picks a pod by
+the same rule and starts the tunnel again on the same local port, so the URL
+stays the same. A connection that was open through the old pod breaks. The
+forward is lost only when no pod runs for two minutes (D16).
 
 ### Target and Match
 

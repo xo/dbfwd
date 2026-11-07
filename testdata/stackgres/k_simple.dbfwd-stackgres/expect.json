@@ -1,0 +1,10 @@
+{
+  "url": "k://simple.dbfwd-stackgres/?context=CONTEXT",
+  "namespace": "dbfwd-stackgres",
+  "user": "postgres",
+  "database": "postgres",
+  "kind": "SGCluster",
+  "name": "simple",
+  "owner": "StackGres SGCluster simple",
+  "type": "postgres"
+}

@@ -1,0 +1,10 @@
+{
+  "url": "k+opensearch-operator://os.dbfwd-opensearch/?context=CONTEXT",
+  "namespace": "dbfwd-opensearch",
+  "user": "admin",
+  "database": "",
+  "kind": "OpenSearchCluster",
+  "name": "os",
+  "owner": "OpenSearch Operator OpenSearchCluster os",
+  "type": "opensearch"
+}

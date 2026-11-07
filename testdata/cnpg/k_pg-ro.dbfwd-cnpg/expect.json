@@ -1,0 +1,10 @@
+{
+  "url": "k://pg-ro.dbfwd-cnpg/?context=CONTEXT",
+  "namespace": "dbfwd-cnpg",
+  "user": "app",
+  "database": "app",
+  "kind": "Service",
+  "name": "pg-ro",
+  "owner": "CloudNativePG Cluster pg",
+  "type": "postgres"
+}

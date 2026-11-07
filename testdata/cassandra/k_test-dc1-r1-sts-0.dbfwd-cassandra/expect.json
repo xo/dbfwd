@@ -1,0 +1,10 @@
+{
+  "url": "k://test-dc1-r1-sts-0.dbfwd-cassandra/?context=CONTEXT",
+  "namespace": "dbfwd-cassandra",
+  "user": "test-superuser",
+  "database": "",
+  "kind": "Pod",
+  "name": "test-dc1-r1-sts-0",
+  "owner": "cass-operator CassandraDatacenter dc1",
+  "type": "cassandra"
+}

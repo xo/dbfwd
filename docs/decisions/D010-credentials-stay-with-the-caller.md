@@ -1,6 +1,6 @@
 # D10. Credentials stay with the caller
 
-Status: Decided.
+Status: Decided. Amended by D16, which adds `watch` on Pods.
 
 `dbfwd` finds a password, such as in a Kubernetes Secret, and gives it to the
 caller, and to nothing else. The rules hold for every backend.
@@ -13,5 +13,6 @@ caller, and to nothing else. The rules hold for every backend.
 4. It asks for the least privilege that the backend needs, and each backend
    documents it. For `k8s`, that is RBAC in the one namespace: `get` on each
    kind it reads, `list` on Services for the Helm release step and on Pods
-   to find the pod of a Service, and `create` on `pods/portforward`. It never
-   lists across the cluster.
+   to find the pod of a Service, `watch` on Pods to follow the pod it forwards
+   to (D16), and `create` on `pods/portforward`. It never lists across the
+   cluster.

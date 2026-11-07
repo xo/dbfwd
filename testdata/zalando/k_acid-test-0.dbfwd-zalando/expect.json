@@ -1,0 +1,10 @@
+{
+  "url": "k://acid-test-0.dbfwd-zalando/?context=CONTEXT",
+  "namespace": "dbfwd-zalando",
+  "user": "app",
+  "database": "app",
+  "kind": "Pod",
+  "name": "acid-test-0",
+  "owner": "Zalando postgres-operator postgresql acid-test",
+  "type": "postgres"
+}

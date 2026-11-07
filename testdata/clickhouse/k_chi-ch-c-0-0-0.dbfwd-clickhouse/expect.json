@@ -1,0 +1,10 @@
+{
+  "url": "k://chi-ch-c-0-0-0.dbfwd-clickhouse/?context=CONTEXT",
+  "namespace": "dbfwd-clickhouse",
+  "user": "default",
+  "database": "default",
+  "kind": "Pod",
+  "name": "chi-ch-c-0-0-0",
+  "owner": "Altinity ClickHouse Operator ClickHouseInstallation ch",
+  "type": "clickhouse"
+}

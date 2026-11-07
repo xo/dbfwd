@@ -15,6 +15,7 @@ import (
 	"maps"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/xo/dburl"
 
@@ -24,10 +25,11 @@ import (
 // name is the name of the backend and of its scheme.
 const name = "k8s"
 
-// podTimeout is how long kubectl port-forward waits for a running pod. A
-// Service with no ready pod, such as the replicas of a cluster with one
-// instance, then fails in this time rather than in a minute.
-const podTimeout = "20s"
+// podWait is how long dbfwd and kubectl port-forward wait for a pod to run,
+// as when an operator replaces the pod. A Service with no pod, such as the
+// replicas of a cluster with one instance, then fails in this time rather
+// than in a minute.
+const podWait = 20 * time.Second
 
 func init() {
 	dbfwd.Register(name, backend{newRunner: func(cfg dbfwd.Config) runner { return newExecRunner(cfg) }})
@@ -78,12 +80,12 @@ func (b backend) Open(ctx context.Context, u *dburl.URL, cfg dbfwd.Config) (*dbf
 	if req.port != 0 {
 		port = req.port
 	}
-	t, err := k.r.forward(ctx, k.args("port-forward", "--address", "127.0.0.1", "--pod-running-timeout", podTimeout, f.forward, ":"+strconv.Itoa(port))...)
+	t, err := startManaged(ctx, k, &picker{k: k, forward: f.forward, pods: f.pods, port: port}, reconnectWait)
 	if err != nil {
 		return nil, fmt.Errorf("forwarding to %s: %w", f.target, err)
 	}
 	return &dbfwd.Opened{
-		URL:      localURL(f.scheme, user, password, t.port(), database, req.query),
+		URL:      localURL(f.scheme, user, password, t.port(), database, f.tls, req.query),
 		User:     user,
 		Database: database,
 		Target:   f.target,
@@ -159,14 +161,12 @@ func pickAccount(ctx context.Context, k *kube, req request, f *found) (account, 
 		}
 		return account{}, fmt.Errorf("finding the user %s in %s: %w", req.user, f.target, dbfwd.ErrNotFound)
 	}
-	if !f.account.password.known() && !f.account.user.known() {
-		return account{}, fmt.Errorf("finding the credentials of %s: %w", f.target, dbfwd.ErrNotFound)
-	}
+	// a database with no auth, such as Scylla by default, has no account
 	return f.account, nil
 }
 
 // localURL builds the URL of the local end.
-func localURL(scheme, user, password string, port int, database string, query url.Values) string {
+func localURL(scheme, user, password string, port int, database string, tls bool, query url.Values) string {
 	u := url.URL{Scheme: scheme, Host: "127.0.0.1:" + strconv.Itoa(port)}
 	switch {
 	case user != "" && password != "":
@@ -176,6 +176,10 @@ func localURL(scheme, user, password string, port int, database string, query ur
 	}
 	q := url.Values{}
 	maps.Copy(q, query)
+	if tls && !q.Has("tls") {
+		// the drivers of usql for these databases read tls from the query
+		q.Set("tls", "true")
+	}
 	if database != "" {
 		if scheme == "sqlserver" {
 			q.Set("database", database)

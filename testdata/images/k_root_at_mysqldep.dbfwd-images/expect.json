@@ -1,0 +1,9 @@
+{
+  "url": "k://root@mysqldep.dbfwd-images/?context=CONTEXT",
+  "namespace": "dbfwd-images",
+  "user": "root",
+  "database": "shop",
+  "kind": "Deployment",
+  "name": "mysqldep",
+  "type": "mysql"
+}

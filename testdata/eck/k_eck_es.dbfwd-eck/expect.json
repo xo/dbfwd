@@ -1,0 +1,10 @@
+{
+  "url": "k+eck://es.dbfwd-eck/?context=CONTEXT",
+  "namespace": "dbfwd-eck",
+  "user": "elastic",
+  "database": "",
+  "kind": "Elasticsearch",
+  "name": "es",
+  "owner": "ECK Elasticsearch es",
+  "type": "elasticsearch"
+}

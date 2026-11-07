@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -209,6 +210,12 @@ func (l *lookup) owned(ctx context.Context, o object) (*ownedBy, error) {
 				return &ownedBy{op: op, child: c, childObj: obj}, err
 			}
 		}
+		if next, ok, err := l.between(ctx, ref); err != nil {
+			return nil, err
+		} else if ok {
+			o = next
+			continue
+		}
 		if group, ok := perconaKinds[ref.kind]; ok && group == ref.group {
 			cr, err := l.k.get(ctx, everest.resource, ref.name)
 			return &ownedBy{op: everest, cr: cr}, err
@@ -225,6 +232,36 @@ func (l *lookup) owned(ctx context.Context, o object) (*ownedBy, error) {
 			return nil, err
 		}
 		o = next
+	}
+	return nil, nil
+}
+
+// between reads an object that sits between an object and the cluster CR in
+// the owner chain of an operator, such as a ScyllaDBDatacenter.
+func (l *lookup) between(ctx context.Context, ref owner) (object, bool, error) {
+	for _, op := range operators {
+		if resource, ok := op.between[ref.kind]; ok && slices.Contains(op.groups, ref.group) {
+			o, err := l.k.get(ctx, resource, ref.name)
+			return o, err == nil, err
+		}
+	}
+	return nil, false, nil
+}
+
+// byLabels returns the operator and the cluster CR that the labels of an
+// object name, for an operator that sets no owner reference by default.
+func (l *lookup) byLabels(ctx context.Context, o object) (*ownedBy, error) {
+	for _, op := range operators {
+		if op.fromLabels == nil {
+			continue
+		}
+		if name := op.fromLabels(o.labels()); name != "" {
+			cr, err := l.getCR(ctx, op.resource, name)
+			if err != nil {
+				return nil, err
+			}
+			return &ownedBy{op: op, cr: cr}, nil
+		}
 	}
 	return nil, nil
 }
@@ -253,7 +290,11 @@ func (l *lookup) fromService(ctx context.Context, svc object) (*found, error) {
 	if svc.str("spec", "type") == "ExternalName" {
 		return nil, fmt.Errorf("forwarding to the service %s, which points outside the cluster: %w", name, dbfwd.ErrUnsupported)
 	}
-	if by, err := l.owned(ctx, svc); err != nil {
+	by, err := l.owned(ctx, svc)
+	if err == nil && by == nil {
+		by, err = l.byLabels(ctx, svc)
+	}
+	if err != nil {
 		return nil, err
 	} else if by != nil {
 		f, err := l.fromOwner(ctx, by, name)
@@ -384,12 +425,23 @@ func (l *lookup) pod(ctx context.Context) (*found, error) {
 // fromPod builds what a lookup found from a Pod.
 func (l *lookup) fromPod(ctx context.Context, pod object) (*found, error) {
 	name := pod.name()
-	if by, err := l.owned(ctx, pod); err != nil {
+	by, err := l.owned(ctx, pod)
+	if err == nil && by == nil {
+		by, err = l.byLabels(ctx, pod)
+	}
+	if err != nil {
 		return nil, err
 	} else if by != nil {
 		f, err := l.fromOwner(ctx, by, "")
 		if err != nil {
 			return nil, err
+		}
+		// the port of the operator is that of its Service, and the pod can
+		// listen on another, as Solr does behind port 80
+		if svc, ok := strings.CutPrefix(f.forward, "service/"); ok {
+			if s, err := l.k.get(ctx, "service", svc); err == nil {
+				f.port = podPort(s, pod, f.port)
+			}
 		}
 		f.forward = "pod/" + name
 		f.target.Kind, f.target.Name = "Pod", name
@@ -403,6 +455,29 @@ func (l *lookup) fromPod(ctx context.Context, pod object) (*found, error) {
 	f.forward = "pod/" + name
 	f.target.Kind, f.target.Name = "Pod", name
 	return f, nil
+}
+
+// podPort returns the port of a pod that a port of a Service reaches: its
+// target port, by number or by the name of a container port. It returns port
+// when the Service does not say.
+func podPort(svc, pod object, port int) int {
+	for _, p := range svc.list("spec", "ports") {
+		if p.num("port") != port {
+			continue
+		}
+		target := p.str("targetPort")
+		if n, err := strconv.Atoi(target); err == nil && n != 0 {
+			return n
+		}
+		if target != "" {
+			for _, c := range object(asMap(pod.get("spec"))).list("containers") {
+				if n := containerPort(c, target); n != 0 {
+					return n
+				}
+			}
+		}
+	}
+	return port
 }
 
 // asMap returns v as a map, or an empty one.

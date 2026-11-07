@@ -28,16 +28,31 @@ func cnpgCluster(r *fakeRunner, superuser bool) {
 	for _, s := range []string{"pg-rw", "pg-ro"} {
 		r.add("service", map[string]any{
 			"metadata": meta(s, map[string]string{"cnpg.io/cluster": "pg"}, cnpgGroup, "Cluster", "pg"),
-			"spec":     map[string]any{"ports": []any{map[string]any{"port": 5432}}},
+			"spec": map[string]any{
+				"selector": map[string]any{"cnpg.io/cluster": "pg"},
+				"ports":    []any{map[string]any{"port": 5432}},
+			},
 		})
 	}
 	r.add("pod", map[string]any{
-		"metadata": meta("pg-1", map[string]string{"cnpg.io/instanceRole": "primary"}, cnpgGroup, "Cluster", "pg"),
+		"metadata": meta("pg-1", map[string]string{"cnpg.io/cluster": "pg", "cnpg.io/instanceRole": "primary"}, cnpgGroup, "Cluster", "pg"),
 	})
 	r.add("secret", secret("pg-app", map[string]string{"username": "app", "password": "app-pass"}))
 	r.add("secret", secret("pg-superuser", map[string]string{"username": "postgres", "password": "su-pass"}))
 	r.add("secret", secret("pg-reporting", map[string]string{"username": "reporting", "password": "rep-pass"}))
 	r.add("secret", secret("other", map[string]string{"username": "svc", "token": "tok-pass"}))
+}
+
+// addService adds a Service with a selector, and a pod that it selects.
+func addService(r *fakeRunner, name string) {
+	r.add("service", map[string]any{
+		"metadata": meta(name, nil),
+		"spec": map[string]any{
+			"selector": map[string]any{"app": name},
+			"ports":    []any{map[string]any{"port": 3306}},
+		},
+	})
+	r.add("pod", map[string]any{"metadata": meta(name+"-0", map[string]string{"app": name})})
 }
 
 // localOf parses the local URL of an Opened.
@@ -110,7 +125,7 @@ func TestCNPGCluster(t *testing.T) {
 	if u.Query().Get("sslmode") != "disable" || u.Query().Has("context") {
 		t.Errorf("local query = %q, expected only sslmode", u.RawQuery)
 	}
-	if want := "--namespace prod port-forward --address 127.0.0.1 --pod-running-timeout 20s service/pg-rw :5432"; r.forwards[0] != want {
+	if want := "--namespace prod port-forward --address 127.0.0.1 --pod-running-timeout 20s pod/pg-1 :5432"; r.forwards[0] != want {
 		t.Errorf("forward = %q, expected %q", r.forwards[0], want)
 	}
 	want := "Cluster pg in context kind-test, namespace prod, owned by CloudNativePG Cluster pg"
@@ -127,8 +142,8 @@ func TestCNPGService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open error = %v", err)
 	}
-	if !strings.Contains(r.forwards[0], "service/pg-ro :5432") {
-		t.Errorf("forward = %q, expected service/pg-ro", r.forwards[0])
+	if !strings.Contains(r.forwards[0], "pod/pg-1 :5432") {
+		t.Errorf("forward = %q, expected pod/pg-1", r.forwards[0])
 	}
 	if got := o.Target.String(); got != "Service pg-ro in context kind-test, namespace prod, owned by CloudNativePG Cluster pg" {
 		t.Errorf("target = %q", got)
@@ -162,8 +177,19 @@ func cnpgPoolers(r *fakeRunner) {
 	}
 	r.add("service", map[string]any{
 		"metadata": meta("pg-pooler-rw", map[string]string{"cnpg.io/cluster": "pg"}, cnpgGroup, "Pooler", "pg-pooler-rw"),
-		"spec":     map[string]any{"ports": []any{map[string]any{"port": 5432, "targetPort": "pgbouncer"}}},
+		"spec": map[string]any{
+			"selector": map[string]any{"cnpg.io/poolerName": "pg-pooler-rw"},
+			"ports":    []any{map[string]any{"port": 5432, "targetPort": "pgbouncer"}},
+		},
 	})
+	r.add("service", map[string]any{
+		"metadata": meta("pg-pooler-ro", nil, cnpgGroup, "Pooler", "pg-pooler-ro"),
+		"spec": map[string]any{
+			"selector": map[string]any{"cnpg.io/poolerName": "pg-pooler-ro"},
+			"ports":    []any{map[string]any{"port": 5432, "targetPort": "pgbouncer"}},
+		},
+	})
+	r.add("pod", map[string]any{"metadata": meta("pg-pooler-ro-1", map[string]string{"cnpg.io/poolerName": "pg-pooler-ro"})})
 	r.add("deployment.apps", map[string]any{
 		"metadata": meta("pg-pooler-rw", nil, cnpgGroup, "Pooler", "pg-pooler-rw"),
 	})
@@ -171,15 +197,15 @@ func cnpgPoolers(r *fakeRunner) {
 		"metadata": meta("pg-pooler-rw-7d9f", nil, "apps/v1", "Deployment", "pg-pooler-rw"),
 	})
 	r.add("pod", map[string]any{
-		"metadata": meta("pg-pooler-rw-7d9f-abcde", nil, "apps/v1", "ReplicaSet", "pg-pooler-rw-7d9f"),
+		"metadata": meta("pg-pooler-rw-7d9f-abcde", map[string]string{"cnpg.io/poolerName": "pg-pooler-rw"}, "apps/v1", "ReplicaSet", "pg-pooler-rw-7d9f"),
 	})
 }
 
 func TestCNPGPooler(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct{ raw, forward, kind string }{
-		{"k://pg-pooler-rw.prod/", "service/pg-pooler-rw :5432", "Pooler"},
-		{"k+cnpg://pg-pooler-ro.prod/", "service/pg-pooler-ro :5432", "Pooler"},
+		{"k://pg-pooler-rw.prod/", "pod/pg-pooler-rw-7d9f-abcde :5432", "Pooler"},
+		{"k+cnpg://pg-pooler-ro.prod/", "pod/pg-pooler-ro-1 :5432", "Pooler"},
 		{"k://pg-pooler-rw-7d9f-abcde.prod/", "pod/pg-pooler-rw-7d9f-abcde :5432", "Pod"},
 	} {
 		t.Run(test.raw, func(t *testing.T) {
@@ -252,7 +278,7 @@ func TestCNPGDatabase(t *testing.T) {
 		t.Fatalf("Open error = %v", err)
 	}
 	u := localOf(t, o)
-	if u.User.Username() != "reporting" || u.Path != "/billing" || !strings.Contains(r.forwards[0], "service/pg-rw") {
+	if u.User.Username() != "reporting" || u.Path != "/billing" || !strings.Contains(r.forwards[0], "pod/pg-1") {
 		t.Errorf("local URL = %s, forward = %q, expected reporting on billing through pg-rw", o.URL, r.forwards[0])
 	}
 }
@@ -312,6 +338,8 @@ func TestMOCO(t *testing.T) {
 	t.Parallel()
 	r := newFake()
 	r.add("mysqlclusters.moco.cybozu.com", map[string]any{"metadata": meta("orders", nil)})
+	addService(r, "moco-orders-primary")
+	addService(r, "moco-orders-replica")
 	r.add("secret", secret("moco-orders", map[string]string{"WRITABLE_PASSWORD": "w-pass", "READONLY_PASSWORD": "r-pass"}))
 	o, err := open(t, r, "k+moco://orders.shop/")
 	if err != nil {
@@ -322,13 +350,13 @@ func TestMOCO(t *testing.T) {
 	if u.Scheme != "mysql" || u.User.Username() != "moco-writable" || pass != "w-pass" || u.Path != "" {
 		t.Errorf("local URL = %s, expected mysql://moco-writable:w-pass@127.0.0.1:41234 with no database", o.URL)
 	}
-	if !strings.Contains(r.forwards[0], "service/moco-orders-primary :3306") {
+	if !strings.Contains(r.forwards[0], "pod/moco-orders-primary-0 :3306") {
 		t.Errorf("forward = %q", r.forwards[0])
 	}
 	if _, err := open(t, r, "k+moco://orders.shop/?role=ro"); err != nil {
 		t.Fatalf("Open with role=ro error = %v", err)
 	}
-	if !strings.Contains(r.forwards[1], "service/moco-orders-replica") {
+	if !strings.Contains(r.forwards[1], "pod/moco-orders-replica-0") {
 		t.Errorf("forward with role=ro = %q", r.forwards[1])
 	}
 }
@@ -345,6 +373,7 @@ func TestMariaDBOperator(t *testing.T) {
 		},
 	})
 	r.add("secret", secret("maria-password", map[string]string{"password": "shop-pass"}))
+	addService(r, "maria-primary")
 	r.add("secret", secret("maria-root", map[string]string{"password": "root-pass"}))
 	o, err := open(t, r, "k://maria.db/")
 	if err != nil {
@@ -355,7 +384,7 @@ func TestMariaDBOperator(t *testing.T) {
 	if u.Scheme != "mariadb" || u.User.Username() != "shop" || pass != "shop-pass" || u.Path != "/shop" {
 		t.Errorf("local URL = %s", o.URL)
 	}
-	if !strings.Contains(r.forwards[0], "service/maria-primary :3306") {
+	if !strings.Contains(r.forwards[0], "pod/maria-primary-0 :3306") {
 		t.Errorf("forward = %q", r.forwards[0])
 	}
 	o, err = open(t, r, "k://root@maria.db/")
@@ -380,11 +409,12 @@ func TestOpenEverest(t *testing.T) {
 		"spec":     map[string]any{"engine": map[string]any{"type": "psmdb"}},
 	})
 	r.add("secret", secret("everest-secrets-shop", map[string]string{"root": "root-pass"}))
+	addService(r, "shop-haproxy")
 	o, err := open(t, r, "k://shop.db/")
 	if err != nil {
 		t.Fatalf("Open error = %v", err)
 	}
-	if u := localOf(t, o); u.User.Username() != "root" || !strings.Contains(r.forwards[0], "service/shop-haproxy :3306") {
+	if u := localOf(t, o); u.User.Username() != "root" || !strings.Contains(r.forwards[0], "pod/shop-haproxy-0 :3306") {
 		t.Errorf("local URL = %s, forward = %q", o.URL, r.forwards[0])
 	}
 	if _, err := open(t, r, "k://docs.db/"); !errors.Is(err, dbfwd.ErrUnsupported) {
@@ -569,19 +599,20 @@ func TestNotFound(t *testing.T) {
 	for _, s := range le.Steps {
 		got = append(got, s.Kind+": "+s.Result)
 	}
-	want := []string{
-		"CloudNativePG Cluster: no match",
-		"mariadb-operator MariaDB: not installed",
-		"MOCO MySQLCluster: not installed",
-		"OpenEverest DatabaseCluster: not installed",
-		"CloudNativePG Pooler: not installed",
-		"CloudNativePG Database: not installed",
-		"Service: no match",
-		"Helm release: no match",
-		"StatefulSet: no match",
-		"Deployment: no match",
-		"Pod: no match",
+	var want []string
+	for _, op := range operators {
+		result := "not installed"
+		if op == cnpg {
+			result = "no match"
+		}
+		want = append(want, op.name+" "+op.kind+": "+result)
 	}
+	for _, op := range operators {
+		for _, c := range op.children {
+			want = append(want, op.name+" "+c.kind+": not installed")
+		}
+	}
+	want = append(want, "Service: no match", "Helm release: no match", "StatefulSet: no match", "Deployment: no match", "Pod: no match")
 	if strings.Join(got, "; ") != strings.Join(want, "; ") {
 		t.Errorf("steps =\n%s\nexpected\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}

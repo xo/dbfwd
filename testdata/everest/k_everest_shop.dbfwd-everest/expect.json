@@ -1,0 +1,10 @@
+{
+  "url": "k+everest://shop.dbfwd-everest/?context=CONTEXT",
+  "namespace": "dbfwd-everest",
+  "user": "root",
+  "database": "",
+  "kind": "DatabaseCluster",
+  "name": "shop",
+  "owner": "OpenEverest DatabaseCluster shop",
+  "type": "mysql"
+}

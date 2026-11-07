@@ -1,0 +1,10 @@
+{
+  "url": "k+arangodb-operator://adb.dbfwd-arangodb/?context=CONTEXT",
+  "namespace": "dbfwd-arangodb",
+  "user": "root",
+  "database": "",
+  "kind": "ArangoDeployment",
+  "name": "adb",
+  "owner": "kube-arangodb ArangoDeployment adb",
+  "type": "arangodb"
+}

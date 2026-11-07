@@ -1,0 +1,10 @@
+{
+  "url": "k://os-nodes-0.dbfwd-opensearch/?context=CONTEXT",
+  "namespace": "dbfwd-opensearch",
+  "user": "admin",
+  "database": "",
+  "kind": "Pod",
+  "name": "os-nodes-0",
+  "owner": "OpenSearch Operator OpenSearchCluster os",
+  "type": "opensearch"
+}

@@ -1,0 +1,9 @@
+{
+  "url": "k://db-creds:password@pgsts.dbfwd-images/?context=CONTEXT",
+  "namespace": "dbfwd-images",
+  "user": "shop",
+  "database": "shop",
+  "kind": "Service",
+  "name": "pgsts",
+  "type": "postgres"
+}

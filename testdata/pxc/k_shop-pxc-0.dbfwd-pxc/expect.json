@@ -1,0 +1,10 @@
+{
+  "url": "k://shop-pxc-0.dbfwd-pxc/?context=CONTEXT",
+  "namespace": "dbfwd-pxc",
+  "user": "root",
+  "database": "",
+  "kind": "Pod",
+  "name": "shop-pxc-0",
+  "owner": "Percona XtraDB Cluster PerconaXtraDBCluster shop",
+  "type": "mysql"
+}

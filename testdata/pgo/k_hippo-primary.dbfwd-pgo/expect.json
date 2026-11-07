@@ -1,0 +1,10 @@
+{
+  "url": "k://hippo-primary.dbfwd-pgo/?context=CONTEXT",
+  "namespace": "dbfwd-pgo",
+  "user": "app",
+  "database": "app",
+  "kind": "Service",
+  "name": "hippo-primary",
+  "owner": "Crunchy PGO PostgresCluster hippo",
+  "type": "postgres"
+}

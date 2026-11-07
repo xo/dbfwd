@@ -1,0 +1,10 @@
+{
+  "url": "k+vitess-operator://vt.dbfwd-vitess/?context=CONTEXT",
+  "namespace": "dbfwd-vitess",
+  "user": "user",
+  "database": "commerce",
+  "kind": "VitessCluster",
+  "name": "vt",
+  "owner": "Vitess Operator VitessCluster vt",
+  "type": "vitess"
+}

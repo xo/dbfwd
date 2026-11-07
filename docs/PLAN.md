@@ -10,43 +10,26 @@ command. A user of `usql` never sees the name `dbfwd`.
 
 ## Where it stands
 
-The design is decided, and the first implementation exists:
+The design is decided, and the implementation covers every operator of tier
+1 (D9):
 
 1. The root package: `Resolve`, `Lookup`, `Handles`, the options, the
    `Forward`, the registry and the errors.
 2. The `k8s` backend: the URL, the `kubectl` runner and port-forward, the
-   lookup chain, the rules of CloudNativePG with its Pooler and Database,
-   mariadb-operator, MOCO and OpenEverest `pxc`, and the pod spec rules for a
-   database with no operator.
-3. The command `cmd/dbfwd`, with `dbfwd <url>`, `usql`, `forward`, `lookup`
-   and `clients`.
-4. Unit tests against a fake `kubectl`, and tests of the runner against a
-   stand-in `kubectl`.
-
-The command ran by hand on 2026-11-07 against a kind cluster from `dbrun`,
-with CloudNativePG v1.30.1 and with a StatefulSet of the official `postgres`
-image. `psql` and `usql` connected through the cluster name, the Services
-`pg-rw`, `pg-r` and `shop-db`, a Pod, a CloudNativePG Pooler and its pod,
-and the Secret form `pg-app:@`. No automated test runs against a cluster
-yet.
-
-| Area | Document | Decisions |
-| --- | --- | --- |
-| The shape: a resolver, a tool per backend, the `Forward` | this file | D2, D3, D4, D11 |
-| The Go API | `docs/API.md` | D15 |
-| The URL | `docs/URL.md` | D5, D6 |
-| How a name becomes a database | `docs/LOOKUP.md` | D7 |
-| The operators | `docs/OPERATORS.md` | D8, D9 |
-| Credentials and security | `docs/URL.md` and D10 | D10 |
-| Testing | `docs/TESTING.md` | D12, D13 |
-| The command line tool | `docs/CLI.md` | D14 |
+   lookup chain, the rules of every supported operator, the pod spec rules
+   for a database with no operator, and the watch that reconnects a forward
+   (D16).
+3. The command `cmd/dbfwd`.
+4. Unit tests against a fake `kubectl`, replay tests of recorded clusters, and
+   a cluster suite for each operator and for databases with no operator, in
+   the `test` module (D12, `docs/TESTING.md`).
 
 ## What other projects give
 
 | Project | What `dbfwd` uses | State |
 | --- | --- | --- |
 | `dburl` | The `k8s` scheme, its aliases and its parsing | Released in v0.57.0 |
-| `dbmeta` | The `dbrun` kind cluster for the tests | Released in v0.34.0 |
+| `dbmeta` | The `dbrun` kind cluster for the tests | Released in v0.35.2 |
 | `dbmeta` | `container.ClientFor`, the client table for the command | Released in v0.35.0 |
 | `usql` | `USQL_DSN`, for `dbfwd usql` | Written, not yet released |
 
@@ -60,8 +43,9 @@ yet.
    (D11).
 3. `usql` calls `Resolve` when the parsed URL has the `k8s` scheme, opens the
    returned URL through `dburl`, and holds the `Forward` for the life of the
-   session. It closes the `Forward` on `\c` and at exit. When the forward is
-   lost, `usql` tells the user and offers to reconnect.
+   session. It closes the `Forward` on `\c` and at exit. When the pod goes,
+   `dbfwd` reconnects on the same local port (D16). When the forward is lost
+   for good, `usql` tells the user and offers to reconnect.
 4. The root package holds the resolver and a registry of backends. `k8s` is
    the first backend, and SSH comes after it works (D4).
 5. A backend runs the tool of its vendor as a child process (D3). The `k8s`
@@ -113,13 +97,18 @@ fake tool and recorded output for the tests (D12).
 
 ## Next steps
 
-1. Write the cluster tests in the `test` module, against a kind cluster from
-   `dbrun`, and record the replay files of each operator and chart.
-2. Read the owner chain of the mariadb-operator `MaxScale` in the upstream
+1. Read the owner chain of the mariadb-operator `MaxScale` in the upstream
    source, then add it to lookup step 2.
-3. Write a full section in `docs/OPERATORS.md` for each tier 1 operator, then
-   its rules.
+2. Run the MySQL Operator suite where `container-registry.oracle.com` serves
+   its images. It skips on a machine where that registry stalls.
+3. Give the drivers of `usql` a way to accept the certificate of a TLS endpoint
+   through a forward, such as that of ECK, whose name is not `127.0.0.1`. This
+   is work in `dbimp`.
+4. Tier 3 databases: add the pod spec rules of each in `docs/LOOKUP.md`.
 
 ## Open questions
 
-None. Ask Ken before you decide a new one.
+Ask Ken. Do not answer one on your own.
+
+None is open now.
+

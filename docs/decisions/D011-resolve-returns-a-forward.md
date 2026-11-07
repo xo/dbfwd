@@ -1,6 +1,6 @@
 # D11. Resolve returns a Forward
 
-Status: Decided.
+Status: Decided. Amended by D16, which reconnects a lost forward.
 
 `Resolve` takes `ctx` first, the parsed URL and options, and returns a
 `Forward`. The `Forward` holds:
@@ -25,10 +25,9 @@ API.
 `dbfwd` prints nothing. Its errors include a kind for "not allowed by RBAC"
 apart from "not found".
 
-When a running forward dies, because a pod restarted, a failover happened or a
-token expired, `dbfwd` does not start it again. `Done` closes and `Err` says
-why, and the caller decides. An open transaction is lost either way, and a
-silent restore hides that loss.
+When the pod of a forward goes, because it restarted or a failover happened,
+`dbfwd` reconnects to a pod picked by the same rule, on the same local port
+(D16). `Done` closes and `Err` says why only when it cannot reconnect.
 
 A credential plugin in a kubeconfig, such as kubelogin, can prompt on the
 terminal, and so can a cloud login. `usql` holds the terminal in raw mode, so
@@ -40,6 +39,5 @@ stdin from `/dev/null` and no terminal. If its login needs to prompt later,
 the forward fails and `Done` reports it. With no wrapper, no child process has
 a terminal, so a login that prompts fails and does not hang.
 
-Rejected: restoring a lost forward on the same port, and a caller-supplied
-stdin, stdout and stderr, which cannot take the terminal from the line editor
-of `usql`.
+Rejected: a caller-supplied stdin, stdout and stderr, which cannot take the
+terminal from the line editor of `usql`.

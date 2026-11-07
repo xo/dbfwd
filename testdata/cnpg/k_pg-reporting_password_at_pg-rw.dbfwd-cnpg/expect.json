@@ -1,0 +1,10 @@
+{
+  "url": "k://pg-reporting:password@pg-rw.dbfwd-cnpg/?context=CONTEXT",
+  "namespace": "dbfwd-cnpg",
+  "user": "reporting",
+  "database": "app",
+  "kind": "Service",
+  "name": "pg-rw",
+  "owner": "CloudNativePG Cluster pg",
+  "type": "postgres"
+}

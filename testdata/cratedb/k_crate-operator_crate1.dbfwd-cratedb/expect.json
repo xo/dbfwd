@@ -1,0 +1,10 @@
+{
+  "url": "k+crate-operator://crate1.dbfwd-cratedb/?context=CONTEXT",
+  "namespace": "dbfwd-cratedb",
+  "user": "system",
+  "database": "",
+  "kind": "CrateDB",
+  "name": "crate1",
+  "owner": "CrateDB Operator CrateDB crate1",
+  "type": "cratedb"
+}

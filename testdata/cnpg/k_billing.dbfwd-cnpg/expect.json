@@ -1,0 +1,10 @@
+{
+  "url": "k://billing.dbfwd-cnpg/?context=CONTEXT",
+  "namespace": "dbfwd-cnpg",
+  "user": "reporting",
+  "database": "billing",
+  "kind": "Database",
+  "name": "billing",
+  "owner": "CloudNativePG Cluster pg",
+  "type": "postgres"
+}

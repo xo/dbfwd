@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/xo/dburl"
 
@@ -35,6 +36,59 @@ type fakeRunner struct {
 
 	calls    []string
 	forwards []string
+
+	// streams holds each watch that dbfwd started, by its pod.
+	streams map[string]*fakeStream
+}
+
+// fakeStream is a watch that a test feeds.
+type fakeStream struct {
+	ch   chan event
+	once sync.Once
+}
+
+func (s *fakeStream) events() <-chan event { return s.ch }
+func (s *fakeStream) stop()                { s.once.Do(func() { close(s.ch) }) }
+
+func (r *fakeRunner) watch(args ...string) (stream, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pod := ""
+	for i, a := range args {
+		if a == "pod" && i+1 < len(args) {
+			pod = args[i+1]
+		}
+	}
+	s := &fakeStream{ch: make(chan event, 4)}
+	if r.streams == nil {
+		r.streams = map[string]*fakeStream{}
+	}
+	r.streams[pod] = s
+	return s, nil
+}
+
+// stream returns the watch of a pod, once dbfwd started it.
+func (r *fakeRunner) stream(t *testing.T, pod string) *fakeStream {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		r.mu.Lock()
+		s := r.streams[pod]
+		r.mu.Unlock()
+		if s != nil {
+			return s
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("no watch of the pod %s", pod)
+	return nil
+}
+
+// forwardCount returns how many forwards dbfwd started.
+func (r *fakeRunner) forwardCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.forwards)
 }
 
 func newFake() *fakeRunner {
@@ -48,6 +102,10 @@ func newFake() *fakeRunner {
 // add stores an object under resource/name.
 func (r *fakeRunner) add(resource string, o map[string]any) {
 	name, _ := o["metadata"].(map[string]any)["name"].(string)
+	if _, ok := o["status"]; resource == "pod" && !ok {
+		// a pod that says nothing of its phase runs
+		o["status"] = map[string]any{"phase": "Running"}
+	}
 	r.objects[resource+"/"+name] = o
 	if strings.Contains(resource, ".") && !strings.HasSuffix(resource, ".apps") {
 		r.installed[resource] = true
@@ -117,6 +175,23 @@ func (r *fakeRunner) get(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if strings.Contains(resource, ".") && !strings.HasSuffix(resource, ".apps") && !r.installed[resource] {
 		return nil, errNotInstalled
+	}
+	if resource == "pods" && strings.Contains(key, "?") {
+		// pods matching a selector come from the pods that were added
+		sel, err := parseSelector(rest[3])
+		if err != nil {
+			return nil, err
+		}
+		var items []any
+		for k, o := range r.objects {
+			if p, ok := strings.CutPrefix(k, "pod/"); ok && p != "" {
+				m, _ := o.(map[string]any)
+				if sel.matches(object(m).labels()) {
+					items = append(items, o)
+				}
+			}
+		}
+		return json.Marshal(map[string]any{"items": items})
 	}
 	if strings.Contains(key, "?") {
 		return json.Marshal(map[string]any{"items": []any{}})

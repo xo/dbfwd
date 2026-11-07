@@ -1,0 +1,10 @@
+{
+  "url": "k+ps://shop.dbfwd-ps/?context=CONTEXT",
+  "namespace": "dbfwd-ps",
+  "user": "root",
+  "database": "",
+  "kind": "PerconaServerMySQL",
+  "name": "shop",
+  "owner": "Percona Server for MySQL PerconaServerMySQL shop",
+  "type": "mysql"
+}

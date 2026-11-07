@@ -1,0 +1,10 @@
+{
+  "url": "k://maria-0.dbfwd-mariadb/?context=CONTEXT",
+  "namespace": "dbfwd-mariadb",
+  "user": "shop",
+  "database": "shop",
+  "kind": "Pod",
+  "name": "maria-0",
+  "owner": "mariadb-operator MariaDB maria",
+  "type": "mariadb"
+}

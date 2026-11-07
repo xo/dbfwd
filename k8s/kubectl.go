@@ -37,6 +37,24 @@ type runner interface {
 	// forward starts kubectl port-forward with args and returns once it
 	// prints the local port.
 	forward(ctx context.Context, args ...string) (tunnel, error)
+
+	// watch starts kubectl get --watch with args, and returns its events.
+	watch(args ...string) (stream, error)
+}
+
+// event is one event of a watch: ADDED, MODIFIED or DELETED, and the object.
+type event struct {
+	Type   string `json:"type"`
+	Object object `json:"object"`
+}
+
+// stream is a running watch.
+type stream interface {
+	// events returns the events, and is closed when the watch stops.
+	events() <-chan event
+
+	// stop stops the watch.
+	stop()
 }
 
 // tunnel is a running port-forward.
@@ -123,6 +141,12 @@ func classify(err error, stderr string) error {
 	if !errors.As(err, &exitErr) {
 		return fmt.Errorf("running %s: %w", tool, dbfwd.ErrNoTool)
 	}
+	return classifyExit(exitErr.ExitCode(), stderr)
+}
+
+// classifyExit turns the exit status and the stderr of kubectl into an error
+// value.
+func classifyExit(code int, stderr string) error {
 	switch s := strings.ToLower(stderr); {
 	case strings.Contains(s, "doesn't have a resource type"):
 		return errNotInstalled
@@ -138,7 +162,7 @@ func classify(err error, stderr string) error {
 	case strings.Contains(s, "context") && strings.Contains(s, "does not exist"):
 		return fmt.Errorf("choosing the kube context: %w", dbfwd.ErrNotFound)
 	}
-	return fmt.Errorf("running %s, which exited with status %d", tool, exitErr.ExitCode())
+	return fmt.Errorf("running %s, which exited with status %d", tool, code)
 }
 
 // forwardLine is the line that kubectl port-forward prints when it is ready.
@@ -182,7 +206,10 @@ func (r *execRunner) forward(ctx context.Context, args ...string) (tunnel, error
 		t.local = n
 		return t, nil
 	case <-t.done:
-		return nil, fmt.Errorf("starting %s port-forward: %w", tool, classify(t.err, t.stderr.String()))
+		// the output of a port-forward holds no credential, so its last line
+		// can say why it stopped
+		stderr := t.stderr.String()
+		return nil, fmt.Errorf("starting %s port-forward: %w: %s", tool, classify(t.err, stderr), lastLine(stderr))
 	case <-ctx.Done():
 		_ = t.Close()
 		return nil, ctx.Err()
@@ -352,4 +379,52 @@ func current(ctx context.Context, r runner, context string) (string, string, err
 		namespace = "default"
 	}
 	return name, namespace, nil
+}
+
+// watch starts kubectl get --watch and decodes each event it prints. It never
+// gets a terminal, and only stop or the end of kubectl stops it.
+func (r *execRunner) watch(args ...string) (stream, error) {
+	cmd := exec.Command(r.path, args...) //nolint:gosec,noctx // a watch outlives the call that starts it, and its arguments reach no shell
+	cmd.Env = r.env
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("starting %s get --watch: %w", tool, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("running %s: %w", tool, dbfwd.ErrNoTool)
+	}
+	w := &watchProcess{cmd: cmd, ch: make(chan event)}
+	go func() {
+		defer close(w.ch)
+		dec := json.NewDecoder(stdout)
+		for {
+			var e event
+			if err := dec.Decode(&e); err != nil {
+				_ = cmd.Wait()
+				return
+			}
+			w.ch <- e
+		}
+	}()
+	return w, nil
+}
+
+// watchProcess is a running kubectl get --watch.
+type watchProcess struct {
+	cmd  *exec.Cmd
+	ch   chan event
+	once sync.Once
+}
+
+func (w *watchProcess) events() <-chan event { return w.ch }
+
+func (w *watchProcess) stop() {
+	w.once.Do(func() {
+		if w.cmd.Process != nil {
+			_ = w.cmd.Process.Kill()
+		}
+	})
+	// drain, so that the decoder can end
+	for range w.ch {
+	}
 }

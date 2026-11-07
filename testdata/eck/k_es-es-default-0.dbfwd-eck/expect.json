@@ -1,0 +1,10 @@
+{
+  "url": "k://es-es-default-0.dbfwd-eck/?context=CONTEXT",
+  "namespace": "dbfwd-eck",
+  "user": "elastic",
+  "database": "",
+  "kind": "Pod",
+  "name": "es-es-default-0",
+  "owner": "ECK Elasticsearch es",
+  "type": "elasticsearch"
+}

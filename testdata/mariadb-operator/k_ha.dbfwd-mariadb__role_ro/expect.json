@@ -1,0 +1,10 @@
+{
+  "url": "k://ha.dbfwd-mariadb/?role=ro\u0026context=CONTEXT",
+  "namespace": "dbfwd-mariadb",
+  "user": "shop",
+  "database": "shop",
+  "kind": "MariaDB",
+  "name": "ha",
+  "owner": "mariadb-operator MariaDB ha",
+  "type": "mariadb"
+}

@@ -1,0 +1,10 @@
+{
+  "url": "k://root@maria.dbfwd-mariadb/?context=CONTEXT",
+  "namespace": "dbfwd-mariadb",
+  "user": "root",
+  "database": "shop",
+  "kind": "MariaDB",
+  "name": "maria",
+  "owner": "mariadb-operator MariaDB maria",
+  "type": "mariadb"
+}

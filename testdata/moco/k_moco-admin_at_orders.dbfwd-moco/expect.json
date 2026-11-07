@@ -1,0 +1,10 @@
+{
+  "url": "k://moco-admin@orders.dbfwd-moco/?context=CONTEXT",
+  "namespace": "dbfwd-moco",
+  "user": "moco-admin",
+  "database": "",
+  "kind": "MySQLCluster",
+  "name": "orders",
+  "owner": "MOCO MySQLCluster orders",
+  "type": "mysql"
+}

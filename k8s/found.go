@@ -20,6 +20,10 @@ type credential struct {
 	// value is empty.
 	optional bool
 	fallback *credential
+
+	// transform turns the value of the key into the value, such as the first
+	// user of a users.json file. It is nil when the value is used as it is.
+	transform func(string) (string, error)
 }
 
 // literal is a credential with a plain value.
@@ -62,6 +66,12 @@ func (c credential) resolve(ctx context.Context, k *kube) (string, error) {
 		return "", err
 	}
 	v, ok := data[c.key]
+	if ok && c.transform != nil {
+		var err error
+		if v, err = c.transform(v); err != nil {
+			return "", fmt.Errorf("reading the key %s of the secret %s: %w", c.key, c.secret, err)
+		}
+	}
 	switch {
 	case !ok && c.optional && c.fallback != nil:
 		return c.fallback.resolve(ctx, k)
@@ -94,6 +104,14 @@ type found struct {
 
 	// role is the role that the target implies, or empty.
 	role string
+
+	// tls is set when the endpoint serves TLS, as ECK does by default.
+	tls bool
+
+	// pods is the label selector of the pods of the role. A Service with no
+	// selector, whose endpoints an operator writes, cannot be forwarded to,
+	// so dbfwd forwards to one of these pods instead.
+	pods string
 
 	// account is the default account, and users holds the others by name.
 	account account

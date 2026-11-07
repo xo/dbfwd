@@ -133,14 +133,16 @@ such as `SELECT 1`. It checks:
 1. Each name reaches the same database, as the same user.
 2. `?role=ro` reaches a replica, where the operator has one.
 3. A `<secret>:<field>` user part and a `<user>` user part both work.
-4. Deleting the primary pod makes `Done` report a lost forward.
+4. After the primary pod is deleted, or a failover moves the primary, the same
+   URL reaches the new primary (D16).
 5. `Close` stops `kubectl` and frees the local port.
 
 ### Least RBAC
 
 Each cluster test also runs as a ServiceAccount that has only the least RBAC
 of D10, in the one namespace: `get` on each kind that `dbfwd` reads, `list`
-on Services and Pods, and `create` on `pods/portforward`. The test proves that `dbfwd` needs nothing more. A
+on Services and Pods, `watch` on Pods (D16), and `create` on
+`pods/portforward`. The test proves that `dbfwd` needs nothing more. A
 second ServiceAccount has no `get` on Secrets, and the test checks that
 `Resolve` returns the RBAC error kind, apart from not found.
 
@@ -172,22 +174,83 @@ The tests then:
 4. Delete every object they made when they end, and name every object with a
    prefix of `dbfwd-test-`.
 
+## Running the cluster tests
+
+The cluster tests are in the `test` module. Start a cluster with `dbrun`,
+then name it in two variables, which `dbrun dsn --json` prints:
+
+```bash
+cd ../dbmeta/test && DBMETA_OWNER_NAME=me go run ./cmd/dbrun start k8s-1.37
+```
+
+```bash
+cd test && DBFWD_TEST_KUBECONFIG=<kubeconfig> DBFWD_TEST_CONTEXT=<context> go test -run TestCNPG -v .
+```
+
+Use `dbmeta` v0.35.2 or later. Under podman, its `dbrun` raises the limit on
+processes of the kind node to 16384, because a node with several operators
+uses more than the default of 2048.
+
+With neither variable, every cluster test skips. Each suite installs its
+operator once, at the release pinned in its file, builds its fixture in the
+namespace `dbfwd-<suite>`, and deletes that namespace when it ends. Set
+`DBFWD_TEST_KEEP=1` to keep it.
+
+| Suite | What it covers |
+| --- | --- |
+| `TestCNPG` | CloudNativePG: the cluster, its Services, a pod, a Pooler and its pod, a Database, both user parts, three errors, a failover that the forward follows to the new primary, `Close` |
+| `TestLeastRBAC` | The least RBAC of D10, and the error when a Secret is not allowed |
+| `TestMariaDBOperator`, `TestMOCO` | mariadb-operator, standalone and with replication, and MOCO |
+| `TestZalando`, `TestCrunchyPGO`, `TestStackGres` | The PostgreSQL operators of tier 1 |
+| `TestOracleMySQLOperator`, `TestPerconaXtraDB`, `TestPerconaServer`, `TestTiDB`, `TestVitess` | The MySQL operators of tier 1 |
+| `TestECK`, `TestOpenSearch`, `TestSolr`, `TestAltinityClickHouse` | Search and analytics |
+| `TestCassOperator`, `TestScylla`, `TestArangoDB`, `TestCrateDB`, `TestCouchbase` | The other operators of tier 1 |
+| `TestOpenEverest` | OpenEverest with its `pxc` engine |
+| `TestOfficialImages`, `TestBitnamiPostgres` | Databases with no operator: a secretKeyRef, a `_FILE` variable, `envFrom`, a Helm release, a Deployment and an exporter beside the database |
+| `TestReconnect` | Deleting the pod behind a forward, by its name and through a Service, keeps the same URL working on the new pod (D16) |
+
+Each suite checks the connection with the protocol of its database: SQL for
+PostgreSQL, MySQL, TiDB, Vitess, CrateDB and ClickHouse, CQL for Cassandra
+and Scylla, and an HTTP request with the credentials for the rest.
+
+Run a suite with `-update` to write its replay files to `testdata/`. The
+tests then run `kubectl` through `test/cmd/kubectl-record`, which records each
+read and writes each Secret value as `fake-<key>`. A key that holds a name,
+such as `username`, keeps its value.
+
+The MySQL Operator pulls its images only from `container-registry.oracle.com`.
+When that registry does not serve them in 15 minutes, its suite skips with the
+reason.
+
+### What a kind cluster changes
+
+A kind cluster under rootless podman differs from a real cluster in ways that
+some fixtures must allow for. Each one is written beside its fixture.
+
+1. A privileged container cannot set `vm.max_map_count`, which is not
+   namespaced. The host value is high enough, so the OpenSearch fixture turns
+   the setting off, and the CrateDB suite takes the init container out of the
+   StatefulSet, because crate-operator has no switch for it.
+2. The node has a limit on processes. ClickHouse asks for 512 threads for one
+   pool, so its fixture asks for 32. `dbrun` from `dbmeta` v0.35.2 raises the
+   limit of the node to 16384.
+3. The Vitess and ArangoDB operators watch only their own namespace, so each
+   runs in the namespace of its suite.
+4. A suite deletes its custom resources before its namespace, while the
+   operator still runs to clear their finalizers.
+5. The Solr chart and its CRDs come from GitHub and `charts.pravega.io`,
+   because `solr.apache.org` does not always answer.
+
 ## CI
 
-GitHub Actions on `ubuntu-latest`, as in `dbmeta`.
+GitHub Actions on `ubuntu-latest`. `.github/workflows/test.yml` holds three
+jobs.
 
 | Job | When | What |
 | --- | --- | --- |
-| Unit | Every push and pull request | Lint, vet, the unit tests and the replay tests, with `-race -count=2` |
-| Cluster | Every push and pull request | One job per operator in the push list. Each job checks out a pinned `dbmeta` release and asks `dbrun` for its own kind cluster, so the jobs run in parallel and one heavy operator cannot starve another |
-| Nightly | Once a night | Every operator and chart, on the oldest and newest Kubernetes release that each one supports |
-
-An operator goes in the push list when its cluster starts in a few minutes on
-a standard runner. CloudNativePG, mariadb-operator, MOCO, the Zalando and
-Crunchy operators and the Helm charts are likely to. Heavy or licensed ones,
-such as Couchbase, ECK, K8ssandra and the Oracle operator, run at night. A
-product that needs a license or a registry login is Verified on a development
-machine and never in CI, as `dbmeta` does (D118 there).
+| Unit | Every push and pull request | Lint of both modules, vet, the unit tests and the replay tests, with `-race -count=2` |
+| Cluster | Every push and pull request | One job per light suite. Each job checks out `dbmeta` at a pinned release, asks `dbrun` for its own kind cluster under docker, and runs one suite |
+| Nightly | Once a night, and by hand | Every suite, one job each |
 
 ## The host
 

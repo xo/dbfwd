@@ -34,7 +34,8 @@ another kind appears.
    database Service, or it stops and names the candidates.
 5. A StatefulSet or a Deployment. For a StatefulSet, `dbfwd` uses the pod
    with ordinal 0, and an operator that owns it picks the primary. For a
-   Deployment, `kubectl port-forward` picks the pod.
+   Deployment, `dbfwd` picks a pod that its selector matches, a ready one
+   first (D16).
 6. A Pod.
 
 With no type, step 1 and step 2 cover every operator that `dbfwd` supports.
@@ -53,6 +54,11 @@ owner references of the object up to a cluster CR, or to a resource of step
 the rules of that operator in `docs/OPERATORS.md`, and the Service or Pod
 picks the role: `pg-rw` is the primary, and `pg-ro` is a replica. If the URL
 also gives a `role` that disagrees, `Resolve` stops with an error (D6).
+
+When an operator matches through a Pod, the port of the operator is that of
+its Service, so `dbfwd` turns it into the target port of the Service, by
+number or by the name of a container port. Solr listens on 8983 behind a
+Service on port 80.
 
 OpenEverest sets no owner reference to its `DatabaseCluster`. So when the walk
 ends at a Percona CR, `dbfwd` reads the `DatabaseCluster` with the same name.

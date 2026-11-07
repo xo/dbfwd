@@ -1,0 +1,10 @@
+{
+  "url": "k://orders.dbfwd-moco/?context=CONTEXT",
+  "namespace": "dbfwd-moco",
+  "user": "moco-writable",
+  "database": "",
+  "kind": "MySQLCluster",
+  "name": "orders",
+  "owner": "MOCO MySQLCluster orders",
+  "type": "mysql"
+}

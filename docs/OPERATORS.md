@@ -5,9 +5,8 @@ reads the user, the password, the database and the Service. Every fact was
 read from the upstream source at the release named. A model answer is not a
 source.
 
-D9 lists the supported operators. Four have a full section here. The rest are
-in the tier 1 table, and each gets a full section before `dbfwd` supports it
-in code. A Secret name changes with the release and with the values of a
+D9 lists the supported operators. Four have a full section here, and the
+rest have a full row in the tier 1 table. A Secret name changes with the release and with the values of a
 chart, so each section names the release it was read from. Read the source
 again when a new release arrives.
 
@@ -128,31 +127,35 @@ tests:
 
 ### Tier 1: supported operators
 
-This table is a summary. Each operator gets a full section like the first
-four before `dbfwd` supports it in code.
+Each row was read from the upstream source at the release named, and has
+rules in the `k8s` package and a suite in the `test` module. "Pods" is the
+label selector of the pods of a role, which `dbfwd` uses when a Service has
+no selector because the operator writes its endpoints.
 
-| Database | Operator | Stars | Cluster CR | Credentials | Service and port |
+| Operator, release | Cluster CR | Default user and database | Secret | Service, port | Pods, and notes |
 | --- | --- | --- | --- | --- | --- |
-| PostgreSQL | Zalando postgres-operator | 5272 | `postgresql`, `acid.zalan.do/v1` | `{user}.{cluster}.credentials.postgresql.acid.zalan.do` | `<name>`, 5432 |
-| PostgreSQL | Crunchy PGO | 4458 | `PostgresCluster`, `postgres-operator.crunchydata.com/v1` | `<name>-pguser-<user>`, keys `user`, `password`, `dbname` | `<name>-primary`, 5432 |
-| PostgreSQL | StackGres | 1444 | `SGCluster`, `stackgres.io/v1` | `<name>`, keys `superuser-username`, `superuser-password` | `<name>`, 5432 |
-| Elasticsearch | ECK, from Elastic | 2855 | `Elasticsearch`, `elasticsearch.k8s.elastic.co/v1` | `<name>-es-elastic-user`, key `elastic`, user `elastic` | `<name>-es-http`, 9200 |
-| ClickHouse | Altinity clickhouse-operator | 2581 | `ClickHouseInstallation`, `clickhouse.altinity.com/v1` | User `default`, empty password, allowed from loopback | `clickhouse-<name>`, 9000 and 8123 |
-| TiDB | TiDB Operator, from PingCAP | 1342 | `TidbCluster`, `pingcap.com/v1alpha1` | User `root`, empty password unless a `TidbInitializer` sets one | `<name>-tidb`, 4000 |
-| MySQL | Oracle MySQL Operator | 947 | `InnoDBCluster`, `mysql.oracle.com/v2` | The Secret named in `spec.secretName` | `<name>`, 3306 |
-| OpenSearch | OpenSearch operator, from the project | 589 | `OpenSearchCluster`, `opensearch.org/v1` | `<name>-admin-password`, keys `username`, `password` | `spec.general.serviceName`, 9200 |
-| MySQL | Percona PXC and Percona Server | 625 and 234 | `PerconaXtraDBCluster`, `PerconaServerMySQL` | `<name>-secrets` | `<name>-haproxy`, 3306 |
-| ScyllaDB | Scylla Operator, from ScyllaDB | 401 | `ScyllaCluster`, `scylla.scylladb.com/v1` | Auth is off by default | `<name>-client`, 9042 |
-| Vitess | vitess-operator, from PlanetScale | 374 | `VitessCluster`, `planetscale.com/v2` | None unless static auth is set | `status.gatewayServiceName`, 3306 |
-| Solr | Solr Operator, from Apache | 285 | `SolrCloud`, `solr.apache.org/v1beta1` | Off by default. With Basic auth, `<name>-solrcloud-basic-auth` | `<name>-solrcloud-common`, 80 |
-| Cassandra | cass-operator and K8ssandra | 228 and 243 | `CassandraDatacenter`, `cassandra.datastax.com/v1beta1` | `<cluster>-superuser`, keys `username`, `password` | `<cluster>-<dc>-service`, 9042 |
-| ArangoDB | kube-arangodb, from ArangoDB | 235 | `ArangoDeployment`, `database.arangodb.com/v1` | User `root`, empty password by default. TLS on | `<name>`, 8529 |
-| CrateDB | crate-operator, from Crate | 27 | `CrateDB`, `cloud.crate.io/v1` | `user-system-<name>`, key `password`, user `system` | `crate-<name>`, 5432 |
-| Couchbase | Couchbase Autonomous Operator | mirror | `CouchbaseCluster`, `couchbase.com/v2` | The Secret named in `spec.security.adminSecret` | `<name>-srv`, query 8093 |
+| Zalando postgres-operator, v2.0.3 | `postgresql`, `acid.zalan.do/v1` | The owner of the first database in `spec.databases`, else `postgres`. Database: that one, else `postgres` | `{user}.{cluster}.credentials.postgresql.acid.zalan.do`, keys `username`, `password`. `_` in a user becomes `-` | `<name>` read-write, with no selector. `<name>-repl` read-only. 5432 | `cluster-name=<name>,spilo-role=master` or `replica`. No owner reference by default, so the labels `application=spilo` and `cluster-name` name the cluster |
+| Crunchy PGO, v6.0.2 | `PostgresCluster`, `postgres-operator.crunchydata.com/v1beta1` | The first of `spec.users`, and its first database. With none, a user and a database named after the cluster | `<name>-pguser-<user>`, keys `user`, `password`, `dbname` | `<name>-primary`, with no selector. `<name>-replicas`. `spec.port`, default 5432 | `postgres-operator.crunchydata.com/role` is `master` or `primary`, or `replica` |
+| StackGres, 1.19.4 | `SGCluster`, `stackgres.io/v1` | `postgres` from the Secret, database `postgres` | `<name>`, keys `superuser-username`, `superuser-password` | `<name>`, with no selector. `<name>-replicas`. 5432 on the pod | `stackgres.io/cluster-name=<name>,role` is `primary` or `master`, or `replica` |
+| MySQL Operator, 26.10.0-2.3.1 | `InnoDBCluster`, `mysql.oracle.com/v2` | The `rootUser` key of the Secret, else `root`. No database | `spec.secretName`, which the person makes, keys `rootUser`, `rootPassword` | `<name>`, the Router. 3306 read-write, 6447 read-only | The images come from `container-registry.oracle.com` |
+| Percona XtraDB Cluster, v1.20.0 | `PerconaXtraDBCluster`, `pxc.percona.com/v1` | `root`. No database | `spec.secretsName`, default `<name>-secrets`, key `root` | `<name>-haproxy`, or `<name>-proxysql`. `<name>-haproxy-replicas`. 3306 | OpenEverest `pxc` makes one of these, so the rule serves both |
+| Percona Server for MySQL, v1.3.0 | `PerconaServerMySQL`, `ps.percona.com/v1` | `root`. No database | `spec.secretsName`, default `<name>-secrets`, key `root` | `<name>-haproxy`, 3306 read-write and 3307 read-only. `<name>-router` when only the Router is on | `mysql.percona.com/primary=true` |
+| TiDB Operator, v1.6.6 | `TidbCluster`, `pingcap.com/v1alpha1` | `root`, with no password unless `spec.tidb.initializer.createPassword`. No database | `<name>-init`, key `root`, only with the initializer | `<name>-tidb`, 4000, only when `spec.tidb.service` is set | `app.kubernetes.io/component=tidb,app.kubernetes.io/instance=<name>`. Every TiDB pod is a SQL node |
+| Vitess Operator, v2.17.1 | `VitessCluster`, `planetscale.com/v2` | The first user of the `users.json` file of vtgate. Database: the first keyspace | The Secret in `cells[].gateway.authentication.static.secret`, key `users.json` by default | `status.gatewayServiceName`, 3306 | vtgate needs static auth, so the fixture sets it |
+| ECK, 3.5.0 | `Elasticsearch`, `elasticsearch.k8s.elastic.co/v1` | `elastic` | `<name>-es-elastic-user`, key `elastic` | `<name>-es-http`, 9200 | HTTPS is on by default. dbfwd adds `tls=true` |
+| OpenSearch Operator, v3.0.0 | `OpenSearchCluster`, `opensearch.org/v1` | `admin` | `spec.security.config.adminCredentialsSecret`, default `<name>-admin-password`, keys `username`, `password` | `spec.general.serviceName`, `spec.general.httpPort` default 9200 | HTTPS when `spec.security.tls.http` is on |
+| Solr Operator, v0.9.1 | `SolrCloud`, `solr.apache.org/v1beta1` | `admin`, when `spec.solrSecurity.authenticationType` is `Basic`. Else no auth | `<name>-solrcloud-security-bootstrap`, key `admin` | `<name>-solrcloud-common`, 80, or 443 with TLS | |
+| Altinity ClickHouse Operator, release-0.27.4 | `ClickHouseInstallation`, `clickhouse.altinity.com/v1` | `default`, with no password, allowed from loopback, where a port-forward arrives. Database `default` | None | `clickhouse-<name>`, 9000 native | |
+| cass-operator, v1.33.1 | `CassandraDatacenter`, `cassandra.datastax.com/v1beta1` | `<clusterName>-superuser`, from the Secret | `spec.superuserSecretName`, default `<clusterName>-superuser`, keys `username`, `password` | `<clusterName>-<dc>-service`, 9042 | |
+| Scylla Operator, v1.23.0 | `ScyllaCluster`, `scylla.scylladb.com/v1` | None. Auth is off unless scylla.yaml turns it on | None | `<name>-client`, 9042 | A Service is owned by a `ScyllaDBDatacenter` of the same name, which the `ScyllaCluster` owns |
+| kube-arangodb, 1.4.7 | `ArangoDeployment`, `database.arangodb.com/v1` | `root`, with no password unless `spec.bootstrap.passwordSecretNames.root` names a Secret, or `Auto` | `<name>-root-password` for `Auto`, key `password` | `<name>`, 8529 | Pods are owned by the CR, with no StatefulSet. TLS is on unless `spec.tls.caSecretName` is `None` |
+| CrateDB Operator, 2.66.0 | `CrateDB`, `cloud.crate.io/v1` | `system` | `user-system-<name>`, key `password` | `crate-<name>`, 5432 for the PostgreSQL protocol | |
+| Couchbase Operator, 2.9.4 | `CouchbaseCluster`, `couchbase.com/v2` | The user of the admin Secret | `spec.security.adminSecret`, which the person makes, keys `username`, `password` | The client Service carries only the admin port, so dbfwd forwards to a pod, on 8093 for queries | `couchbase_cluster=<name>,couchbase_service_query=enabled`. Pods are owned by the CR. The chart runs the Enterprise image |
 
-The star counts of CrateDB and Couchbase are low because the vendor builds
-them, and the public repository is small or a mirror. Both vendors publish
-them as the supported way to run on Kubernetes.
+A TLS endpoint gets `tls=true` in the local URL, which the drivers of `usql`
+read. The certificate names the Services of the cluster and not
+`127.0.0.1`, so a driver that checks it refuses the connection. The fixtures
+turn TLS off.
 
 ### Tier 2: operators with a limit
 

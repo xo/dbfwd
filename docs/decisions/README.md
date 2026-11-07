@@ -21,9 +21,10 @@ Read the status before the decision.
 | [D7](D007-dbfwd-finds-the-database-from-any-name.md) | dbfwd finds the database from any name | Decided |
 | [D8](D008-the-map-from-an-operator-to-a-scheme-lives-in-dbfwd.md) | The map from an operator to a scheme lives in dbfwd | Decided |
 | [D9](D009-the-supported-operators.md) | The supported operators | Decided |
-| [D10](D010-credentials-stay-with-the-caller.md) | Credentials stay with the caller | Decided |
-| [D11](D011-resolve-returns-a-forward.md) | Resolve returns a Forward | Decided |
+| [D10](D010-credentials-stay-with-the-caller.md) | Credentials stay with the caller | Decided, amended by D16 |
+| [D11](D011-resolve-returns-a-forward.md) | Resolve returns a Forward | Decided, amended by D16 |
 | [D12](D012-tests-replay-recorded-clusters-and-run-on-kind.md) | Tests replay recorded clusters and run on kind | Decided |
 | [D13](D013-dbrun-owns-the-kind-cluster.md) | dbrun owns the kind cluster | Decided |
 | [D14](D014-the-dbfwd-command-runs-a-native-client-or-usql.md) | The dbfwd command runs a native client or usql | Decided |
 | [D15](D015-the-go-api.md) | The Go API | Decided |
+| [D16](D016-dbfwd-watches-the-target-and-reconnects.md) | dbfwd watches the target and reconnects | Decided |

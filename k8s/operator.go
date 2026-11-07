@@ -33,6 +33,16 @@ type operator struct {
 	// children are the other resources of the operator that name a cluster,
 	// for lookup step 2.
 	children []*child
+
+	// fromLabels returns the name of the cluster that the labels of a Service
+	// or a Pod name, for an operator that sets no owner reference by default.
+	// It is nil for the others.
+	fromLabels func(labels map[string]string) string
+
+	// between maps the kind of an object that sits between a Service and the
+	// cluster CR in the owner chain to its resource, such as the
+	// ScyllaDBDatacenter of Scylla Operator.
+	between map[string]string
 }
 
 // child is a resource of an operator that names a cluster, such as a
@@ -72,7 +82,12 @@ func (op *operator) owns(kind, group string) bool {
 
 // operators is every supported operator with rules. The order is the order of
 // the first step of the lookup.
-var operators = []*operator{cnpg, mariadbOperator, moco, everest}
+var operators = []*operator{
+	cnpg, zalando, crunchy, stackgres,
+	mariadbOperator, moco, oracleMySQL, everest, perconaXtraDB, perconaServer, tidb, vitess,
+	eck, openSearch, solr, altinity,
+	cassOperator, scylla, arango, crate, couchbase,
+}
 
 // operatorFor returns the operator with the key, such as cnpg.
 func operatorFor(key string) *operator {
@@ -87,9 +102,25 @@ func operatorFor(key string) *operator {
 // perconaKinds are the CRs that OpenEverest makes. Each one has the name of
 // its DatabaseCluster, and no owner reference to it.
 var perconaKinds = map[string]string{
-	"PerconaXtraDBCluster": "pxc.percona.com",
-	"PerconaPGCluster":     "pgv2.percona.com",
-	"PostgresCluster":      "upstream.pgv2.percona.com",
+	"PerconaPGCluster": "pgv2.percona.com",
+	"PostgresCluster":  "upstream.pgv2.percona.com",
+}
+
+// roleLabel returns the value of a role label for the role: primary for rw,
+// and replica for ro.
+func roleLabel(role, primary, replica string) string {
+	if pick(role) == roleRO {
+		return replica
+	}
+	return primary
+}
+
+// orDefault returns s, or def when s is empty.
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 // pick returns ro when role is ro, and rw otherwise.
@@ -124,8 +155,13 @@ var cnpg = &operator{
 		if appSecret == "" {
 			appSecret = name + "-app"
 		}
+		instanceRole := "primary"
+		if pick(role) == roleRO {
+			instanceRole = "replica"
+		}
 		f := &found{
 			scheme:   "postgres",
+			pods:     "cnpg.io/cluster=" + name + ",cnpg.io/instanceRole=" + instanceRole,
 			forward:  "service/" + name + "-" + pick(role),
 			port:     5432,
 			role:     pick(role),
@@ -178,7 +214,8 @@ var cnpgPooler = &child{
 		return ""
 	},
 	apply: func(obj object, f *found) {
-		f.forward, f.port = "service/"+obj.name(), 5432
+		// the pods of the cluster are not the pods of the Pooler
+		f.forward, f.port, f.pods = "service/"+obj.name(), 5432, ""
 	},
 }
 
@@ -223,6 +260,7 @@ var mariadbOperator = &operator{
 		root := account{user: literal("root"), password: keyRef(cr, name+"-root", "spec", "rootPasswordSecretKeyRef")}
 		f := &found{
 			scheme:  "mariadb",
+			pods:    "app.kubernetes.io/instance=" + name + ",k8s.mariadb.com/role=" + map[string]string{roleRW: "primary", roleRO: "replica"}[pick(role)],
 			forward: "service/" + service,
 			port:    port,
 			role:    pick(role),
@@ -279,6 +317,7 @@ var moco = &operator{
 		}
 		f := &found{
 			scheme:  "mysql",
+			pods:    "app.kubernetes.io/instance=" + name + ",app.kubernetes.io/created-by=moco,moco.cybozu.com/role=" + map[string]string{roleRW: "primary", roleRO: "replica"}[pick(role)],
 			forward: "service/" + service,
 			port:    3306,
 			role:    pick(role),

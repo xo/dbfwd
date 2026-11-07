@@ -1,0 +1,9 @@
+{
+  "url": "k://my-pg-postgresql-0.dbfwd-bitnami/?context=CONTEXT",
+  "namespace": "dbfwd-bitnami",
+  "user": "postgres",
+  "database": "postgres",
+  "kind": "Pod",
+  "name": "my-pg-postgresql-0",
+  "type": "postgres"
+}

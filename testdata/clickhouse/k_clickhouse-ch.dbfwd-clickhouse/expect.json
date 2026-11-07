@@ -1,0 +1,10 @@
+{
+  "url": "k://clickhouse-ch.dbfwd-clickhouse/?context=CONTEXT",
+  "namespace": "dbfwd-clickhouse",
+  "user": "default",
+  "database": "default",
+  "kind": "Service",
+  "name": "clickhouse-ch",
+  "owner": "Altinity ClickHouse Operator ClickHouseInstallation ch",
+  "type": "clickhouse"
+}

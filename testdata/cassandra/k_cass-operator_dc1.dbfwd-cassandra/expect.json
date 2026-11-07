@@ -1,0 +1,10 @@
+{
+  "url": "k+cass-operator://dc1.dbfwd-cassandra/?context=CONTEXT",
+  "namespace": "dbfwd-cassandra",
+  "user": "test-superuser",
+  "database": "",
+  "kind": "CassandraDatacenter",
+  "name": "dc1",
+  "owner": "cass-operator CassandraDatacenter dc1",
+  "type": "cassandra"
+}

@@ -1,0 +1,10 @@
+{
+  "url": "k://basic-tidb.dbfwd-tidb/?context=CONTEXT",
+  "namespace": "dbfwd-tidb",
+  "user": "root",
+  "database": "",
+  "kind": "Service",
+  "name": "basic-tidb",
+  "owner": "TiDB Operator TidbCluster basic",
+  "type": "tidb"
+}

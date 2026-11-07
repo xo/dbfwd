@@ -43,6 +43,11 @@ func fakeKubectl(mode string, args []string) int {
 		time.Sleep(100 * time.Millisecond)
 		fmt.Fprintln(os.Stderr, "error: lost connection to pod")
 		return 1
+	case "watch":
+		fmt.Println(`{"type":"ADDED","object":{"metadata":{"name":"pg-1"},"status":{"phase":"Running"}}}`)
+		fmt.Println(`{"type":"DELETED","object":{"metadata":{"name":"pg-1"}}}`)
+		time.Sleep(time.Minute)
+		return 0
 	case "forward-fails":
 		fmt.Fprintln(os.Stderr, `Error from server (Forbidden): pods "pg-1" is forbidden`)
 		return 1
@@ -150,6 +155,25 @@ func TestExecRunnerForwardFails(t *testing.T) {
 	_, err := helperRunner(t, "forward-fails").forward(t.Context(), "port-forward")
 	if !errors.Is(err, dbfwd.ErrForbidden) {
 		t.Errorf("forward error = %v, expected %v", err, dbfwd.ErrForbidden)
+	}
+}
+
+func TestExecRunnerWatch(t *testing.T) {
+	t.Parallel()
+	w, err := helperRunner(t, "watch").watch("get", "pod", "pg-1", "--watch")
+	if err != nil {
+		t.Fatalf("watch error = %v", err)
+	}
+	var types []string
+	for e := range w.events() {
+		types = append(types, e.Type+" "+e.Object.name())
+		if len(types) == 2 {
+			break
+		}
+	}
+	w.stop()
+	if got := strings.Join(types, ", "); got != "ADDED pg-1, DELETED pg-1" {
+		t.Errorf("events = %s, expected ADDED pg-1, DELETED pg-1", got)
 	}
 }
 

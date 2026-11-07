@@ -1,0 +1,10 @@
+{
+  "url": "k://pg-2.dbfwd-cnpg/?context=CONTEXT",
+  "namespace": "dbfwd-cnpg",
+  "user": "app",
+  "database": "app",
+  "kind": "Pod",
+  "name": "pg-2",
+  "owner": "CloudNativePG Cluster pg",
+  "type": "postgres"
+}

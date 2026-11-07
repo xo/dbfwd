@@ -1,0 +1,10 @@
+{
+  "url": "k://scylla-client.dbfwd-scylla/?context=CONTEXT",
+  "namespace": "dbfwd-scylla",
+  "user": "",
+  "database": "",
+  "kind": "Service",
+  "name": "scylla-client",
+  "owner": "Scylla Operator ScyllaCluster scylla",
+  "type": "cassandra"
+}

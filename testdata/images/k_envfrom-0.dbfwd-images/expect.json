@@ -1,0 +1,9 @@
+{
+  "url": "k://envfrom-0.dbfwd-images/?context=CONTEXT",
+  "namespace": "dbfwd-images",
+  "user": "app",
+  "database": "app",
+  "kind": "Pod",
+  "name": "envfrom-0",
+  "type": "postgres"
+}

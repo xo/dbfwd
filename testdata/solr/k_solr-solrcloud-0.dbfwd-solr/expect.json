@@ -1,0 +1,10 @@
+{
+  "url": "k://solr-solrcloud-0.dbfwd-solr/?context=CONTEXT",
+  "namespace": "dbfwd-solr",
+  "user": "admin",
+  "database": "",
+  "kind": "Pod",
+  "name": "solr-solrcloud-0",
+  "owner": "Solr Operator SolrCloud solr",
+  "type": "solr"
+}
