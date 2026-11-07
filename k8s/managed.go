@@ -62,14 +62,12 @@ func startManaged(ctx context.Context, k *kube, p *picker, wait time.Duration) (
 // Done returns a channel that is closed when the forward stops for good.
 func (m *managed) Done() <-chan struct{} { return m.done }
 
-// Err returns why the forward stopped, after Done is closed.
+// Err returns why the forward stopped, after Done is closed. The Forward
+// that holds it adds ErrForwardLost.
 func (m *managed) Err() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.err != nil {
-		return fmt.Errorf("%w: %w", dbfwd.ErrForwardLost, m.err)
-	}
-	return nil
+	return m.err
 }
 
 // Close stops the forward and waits for it.

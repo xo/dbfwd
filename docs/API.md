@@ -130,7 +130,8 @@ func (f *Forward) Done() <-chan struct{}
 func (f *Forward) Err() error
 
 // Close stops the forward and releases the local port. It is safe to call
-// more than once.
+// more than once. On Linux, when the process dies with no Close, such as by
+// SIGKILL, the k8s backend stops its kubectl too (D17).
 func (f *Forward) Close() error
 
 // String returns the target, such as "Service pg-rw in prod, owned by

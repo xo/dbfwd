@@ -182,7 +182,8 @@ func (r *execRunner) forward(ctx context.Context, args ...string) (tunnel, error
 	}
 	t := &process{cmd: cmd, done: make(chan struct{})}
 	cmd.Stderr = &t.stderr
-	if err := cmd.Start(); err != nil {
+	release, err := startChild(cmd)
+	if err != nil {
 		return nil, fmt.Errorf("running %s: %w", tool, dbfwd.ErrNoTool)
 	}
 	ready := make(chan int, 1)
@@ -199,6 +200,7 @@ func (r *execRunner) forward(ctx context.Context, args ...string) (tunnel, error
 	}()
 	go func() {
 		t.err = cmd.Wait()
+		release()
 		close(t.done)
 	}()
 	select {
@@ -390,7 +392,8 @@ func (r *execRunner) watch(args ...string) (stream, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting %s get --watch: %w", tool, err)
 	}
-	if err := cmd.Start(); err != nil {
+	release, err := startChild(cmd)
+	if err != nil {
 		return nil, fmt.Errorf("running %s: %w", tool, dbfwd.ErrNoTool)
 	}
 	w := &watchProcess{cmd: cmd, ch: make(chan event)}
@@ -401,6 +404,7 @@ func (r *execRunner) watch(args ...string) (stream, error) {
 			var e event
 			if err := dec.Decode(&e); err != nil {
 				_ = cmd.Wait()
+				release()
 				return
 			}
 			w.ch <- e

@@ -122,8 +122,13 @@ func TestManagedGivesUp(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("the forward did not give up")
 	}
-	if err := m.Err(); !errors.Is(err, dbfwd.ErrForwardLost) {
-		t.Errorf("Err = %v, expected %v", err, dbfwd.ErrForwardLost)
+	err := m.Err()
+	if !errors.Is(err, dbfwd.ErrNotFound) {
+		t.Errorf("Err = %v, expected %v", err, dbfwd.ErrNotFound)
+	}
+	// the Forward adds ErrForwardLost, so the tunnel does not
+	if errors.Is(err, dbfwd.ErrForwardLost) {
+		t.Errorf("Err = %v, expected no %v, which the Forward adds", err, dbfwd.ErrForwardLost)
 	}
 }
 

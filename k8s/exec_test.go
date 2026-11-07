@@ -1,11 +1,15 @@
 package k8s
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -46,6 +50,19 @@ func fakeKubectl(mode string, args []string) int {
 	case "watch":
 		fmt.Println(`{"type":"ADDED","object":{"metadata":{"name":"pg-1"},"status":{"phase":"Running"}}}`)
 		fmt.Println(`{"type":"DELETED","object":{"metadata":{"name":"pg-1"}}}`)
+		time.Sleep(time.Minute)
+		return 0
+	case "parent":
+		// a dbfwd that starts a port-forward, says its pid, and waits to be
+		// killed
+		r := newExecRunner(dbfwd.Config{Tools: map[string]string{tool: os.Args[0]}, Env: []string{helperEnv + "=forward"}})
+		t, err := r.forward(context.Background(), "port-forward")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		p, _ := t.(*process)
+		fmt.Println(p.cmd.Process.Pid)
 		time.Sleep(time.Minute)
 		return 0
 	case "forward-fails":
@@ -197,5 +214,45 @@ func TestClassify(t *testing.T) {
 	}
 	if got := classify(errors.New("exec: not found"), ""); !errors.Is(got, dbfwd.ErrNoTool) {
 		t.Errorf("classify(not an exit) = %v, expected %v", got, dbfwd.ErrNoTool)
+	}
+}
+
+func TestChildDiesWithParent(t *testing.T) {
+	t.Parallel()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable error = %v", err)
+	}
+	parent := exec.CommandContext(t.Context(), exe)
+	parent.Env = append(os.Environ(), helperEnv+"=parent")
+	out, err := parent.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parent.Start(); err != nil {
+		t.Fatal(err)
+	}
+	sc := bufio.NewScanner(out)
+	if !sc.Scan() {
+		t.Fatalf("the parent printed no pid: %v", parent.Wait())
+	}
+	pid, err := strconv.Atoi(sc.Text())
+	if err != nil {
+		t.Fatalf("pid = %q: %v", sc.Text(), err)
+	}
+	child, err := os.FindProcess(pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// SIGKILL, so that no Close runs
+	_ = parent.Process.Kill()
+	_ = parent.Wait()
+	deadline := time.Now().Add(5 * time.Second)
+	for child.Signal(syscall.Signal(0)) == nil {
+		if time.Now().After(deadline) {
+			_ = child.Kill()
+			t.Fatalf("kubectl %d still runs after its parent was killed", pid)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

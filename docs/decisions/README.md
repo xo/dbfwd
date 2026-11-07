@@ -28,3 +28,4 @@ Read the status before the decision.
 | [D14](D014-the-dbfwd-command-runs-a-native-client-or-usql.md) | The dbfwd command runs a native client or usql | Decided |
 | [D15](D015-the-go-api.md) | The Go API | Decided |
 | [D16](D016-dbfwd-watches-the-target-and-reconnects.md) | dbfwd watches the target and reconnects | Decided |
+| [D17](D017-kubectl-dies-with-its-parent.md) | kubectl dies with its parent | Decided |
