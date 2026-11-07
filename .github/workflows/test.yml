@@ -2,6 +2,9 @@
 #
 # The unit job needs no cluster. It runs the unit tests and the replay tests,
 # which feed dbfwd the kubectl output that the cluster tests recorded (D12).
+# It runs on Linux, macOS and Windows, because usql ships the package on all
+# three. Lint and the formatting check run on Linux only, because they read
+# the source, which is the same everywhere.
 #
 # The cluster jobs run the test module against a kind cluster that dbrun, in
 # dbmeta, starts under docker (D13). Each job runs one suite in a cluster of
@@ -30,8 +33,12 @@ env:
 
 jobs:
   unit:
-    name: Unit
-    runs-on: ubuntu-latest
+    name: Unit ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -43,6 +50,7 @@ jobs:
           check-latest: true
 
       - name: Lint
+        if: runner.os == 'Linux'
         # Pinned. The configuration is `default: all`, so an unpinned upgrade
         # enables a new linter and fails a build that changed nothing.
         uses: golangci/golangci-lint-action@v9
@@ -50,12 +58,14 @@ jobs:
           version: v2.13.1
 
       - name: Lint the test module
+        if: runner.os == 'Linux'
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13.1
           working-directory: test
 
       - name: Check formatting
+        if: runner.os == 'Linux'
         run: |
           out=$(gofmt -l .)
           if [ -n "$out" ]; then
@@ -65,12 +75,15 @@ jobs:
           fi
 
       - name: Vet
+        shell: bash
         run: go vet ./... && (cd test && go vet ./...)
 
       - name: Build
+        shell: bash
         run: go build ./... && CGO_ENABLED=0 go build ./...
 
       - name: Test
+        shell: bash
         run: go test -race -count=2 ./...
 
   cluster:

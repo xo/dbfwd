@@ -90,7 +90,9 @@ something is written down, it is not written down, and it is an open question.
 9. The root module is pure Go and has no cgo. A consumer builds it with
    `CGO_ENABLED=0` and cross compiles it.
 10. Never write a `//go:build` constraint on an operating system or an
-    architecture. Testing is `linux/amd64` only.
+    architecture. The unit tests run on Linux, macOS and Windows, and the
+    cluster tests run on Linux only. A test that needs a feature of one
+    system skips itself where the system lacks it.
 11. Write idiomatic Go.
 12. A test in the root module never needs a cluster. It runs against a fake
     `kubectl` or against recorded JSON in `testdata/`. A test that needs a
@@ -198,7 +200,9 @@ Run the tests with `-count=2`, because that is what CI runs. A test body that
 registers something in a package level registry fails the second time.
 Registration belongs in `init`.
 
-CI runs on GitHub Actions, on `ubuntu-latest` only. Keep the workflow small.
+CI runs on GitHub Actions. The unit job runs on `ubuntu-latest`,
+`macos-latest` and `windows-latest`, and the cluster jobs run on
+`ubuntu-latest` only. Keep the workflow small.
 
 ## Writing documentation
 

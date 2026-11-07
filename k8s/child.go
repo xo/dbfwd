@@ -44,8 +44,14 @@ func setDeathSignal(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
-	f := reflect.ValueOf(cmd.SysProcAttr).Elem().FieldByName("Pdeathsig")
-	if f.IsValid() && f.CanSet() && f.Kind() == reflect.Int {
+	if f, ok := deathSignal(cmd.SysProcAttr); ok {
 		f.SetInt(int64(syscall.SIGKILL))
 	}
+}
+
+// deathSignal returns the field Pdeathsig of attr, and whether the system
+// has it.
+func deathSignal(attr *syscall.SysProcAttr) (reflect.Value, bool) {
+	f := reflect.ValueOf(attr).Elem().FieldByName("Pdeathsig")
+	return f, f.IsValid() && f.CanSet() && f.Kind() == reflect.Int
 }

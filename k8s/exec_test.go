@@ -219,6 +219,9 @@ func TestClassify(t *testing.T) {
 
 func TestChildDiesWithParent(t *testing.T) {
 	t.Parallel()
+	if _, ok := deathSignal(&syscall.SysProcAttr{}); !ok {
+		t.Skip("the system has no Pdeathsig, so a child outlives a killed parent (D17)")
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable error = %v", err)

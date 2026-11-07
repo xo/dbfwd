@@ -243,13 +243,12 @@ some fixtures must allow for. Each one is written beside its fixture.
 
 ## CI
 
-GitHub Actions on `ubuntu-latest`. `.github/workflows/test.yml` holds three
-jobs.
+GitHub Actions. `.github/workflows/test.yml` holds three jobs.
 
 | Job | When | What |
 | --- | --- | --- |
-| Unit | Every push and pull request | Lint of both modules, vet, the unit tests and the replay tests, with `-race -count=2` |
-| Cluster | Every push and pull request | One job per light suite. Each job checks out `dbmeta` at a pinned release, asks `dbrun` for its own kind cluster under docker, and runs one suite |
+| Unit | Every push and pull request, on `ubuntu-latest`, `macos-latest` and `windows-latest` | Vet, the unit tests and the replay tests, with `-race -count=2`. Lint of both modules and the formatting check run on Linux only |
+| Cluster | Every push and pull request, on `ubuntu-latest` | One job per light suite. Each job checks out `dbmeta` at a pinned release, asks `dbrun` for its own kind cluster under docker, and runs one suite |
 | Nightly | Once a night, and by hand | Every suite, one job each |
 
 ## The host
