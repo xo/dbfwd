@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -33,6 +34,10 @@ type fakeRunner struct {
 	// noDiscovery makes kubectl api-resources fail, so that each step asks
 	// for itself.
 	noDiscovery bool
+
+	// listed holds the objects that a listing reads, by resource, with their
+	// kind, apiVersion and namespace.
+	listed map[string][]map[string]any
 
 	calls    []string
 	forwards []string
@@ -126,13 +131,20 @@ func (r *fakeRunner) get(_ context.Context, args ...string) ([]byte, error) {
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, strings.Join(args, " "))
 	var rest []string
+	namespace := ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--context", "--namespace", "--output":
+		case "--namespace":
+			namespace = args[i+1]
+			i++
+		case "--context", "--output":
 			i++
 		default:
 			rest = append(rest, args[i])
 		}
+	}
+	if slices.Contains(rest, "--request-timeout") {
+		return r.listing(rest[1], namespace, slices.Contains(rest, "--all-namespaces"))
 	}
 	if len(rest) > 0 && rest[0] == "config" {
 		return json.Marshal(map[string]any{
@@ -148,7 +160,7 @@ func (r *fakeRunner) get(_ context.Context, args ...string) ([]byte, error) {
 			return nil, dbfwd.ErrForbidden
 		}
 		var b strings.Builder
-		for _, core := range []string{"services", "pods", "secrets", "statefulsets.apps", "deployments.apps"} {
+		for _, core := range []string{"services", "pods", "secrets", "statefulsets.apps", "deployments.apps", "replicasets.apps"} {
 			b.WriteString(core + "\n")
 		}
 		for res := range r.installed {
@@ -197,6 +209,37 @@ func (r *fakeRunner) get(_ context.Context, args ...string) ([]byte, error) {
 		return json.Marshal(map[string]any{"items": []any{}})
 	}
 	return nil, errNotFound
+}
+
+// addListed stores an object for a listing, under its resource.
+func (r *fakeRunner) addListed(resource, kind, apiVersion, namespace string, o map[string]any) {
+	if r.listed == nil {
+		r.listed = map[string][]map[string]any{}
+	}
+	o["kind"], o["apiVersion"] = kind, apiVersion
+	meta, _ := o["metadata"].(map[string]any)
+	meta["namespace"] = namespace
+	if strings.Contains(resource, ".") && !strings.HasSuffix(resource, ".apps") {
+		r.installed[resource] = true
+	}
+	r.listed[resource] = append(r.listed[resource], o)
+}
+
+// listing answers kubectl get of several kinds, in one namespace or in every
+// namespace. A forbidden kind fails the whole call, as kubectl does.
+func (r *fakeRunner) listing(kinds, namespace string, all bool) ([]byte, error) {
+	items := []any{}
+	for kind := range strings.SplitSeq(kinds, ",") {
+		if r.forbidden[kind] || (all && r.forbidden["--all-namespaces"]) {
+			return nil, dbfwd.ErrForbidden
+		}
+		for _, o := range r.listed[kind] {
+			if all || object(o).str("metadata", "namespace") == namespace {
+				items = append(items, o)
+			}
+		}
+	}
+	return json.Marshal(map[string]any{"items": items})
 }
 
 func (r *fakeRunner) forward(_ context.Context, args ...string) (tunnel, error) {

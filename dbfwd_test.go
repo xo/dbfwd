@@ -298,3 +298,14 @@ func (capture) Lookup(_ context.Context, _ *dburl.URL, cfg dbfwd.Config) (*dbfwd
 func (capture) Open(context.Context, *dburl.URL, dbfwd.Config) (*dbfwd.Opened, error) {
 	return nil, dbfwd.ErrUnsupported
 }
+
+func TestListUnsupported(t *testing.T) {
+	t.Parallel()
+	// the fake backend is no Lister
+	if _, err := dbfwd.List(t.Context(), fakeURL("*")); !errors.Is(err, dbfwd.ErrUnsupported) {
+		t.Errorf("List error = %v, expected %v", err, dbfwd.ErrUnsupported)
+	}
+	if _, err := dbfwd.List(t.Context(), &dburl.URL{SchemeName: "nope"}); !errors.Is(err, dbfwd.ErrNoBackend) {
+		t.Errorf("List error = %v, expected %v", err, dbfwd.ErrNoBackend)
+	}
+}

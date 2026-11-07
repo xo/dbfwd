@@ -21,6 +21,7 @@ flag of the client as its own.
 | `dbfwd usql <url> [-- <args>]` | The same, with `usql` in place of the native client |
 | `dbfwd forward <url>` | Starts the forward and holds it until Ctrl-C. It prints the local address, the user and the database, and never the password |
 | `dbfwd lookup <url>` | Runs the lookup and prints each step and what matched (D7). It reads no Secret and starts no forward, so a person can see why a name did not match |
+| `dbfwd list [<scope>]` | Lists the databases that `dbfwd` can reach, one row each, with the URL that reaches it (D18, `docs/LIST.md`). The scope is a listing URL, and its `k://` is optional: `*` is the current namespace, `pg*.prod` a pattern in `prod`, and `cnpg://*` the CloudNativePG clusters. With no scope, it lists the current namespace. It reads no Secret |
 | `dbfwd clients` | Lists the client of each database type, and `usql`, and whether each is on the `PATH` |
 
 Flags:
@@ -29,11 +30,20 @@ Flags:
 | --- | --- |
 | `--client <command>` | Runs another client of the same database, such as `pgcli` in place of `psql`. It takes the same arguments. Only `dbfwd <url>` has it |
 | `--print` | Prints the client command and the names of its environment variables, with the password masked, and runs nothing. Only `dbfwd <url>` has it |
+| `-A`, `--all-namespaces` | Lists every namespace. Only `dbfwd list` has it |
+| `-n`, `--namespace <name>` | Lists one namespace. Only `dbfwd list` has it |
+| `--context <name>` | Lists in that context. Only `dbfwd list` has it. Every other command takes the context as `?context=` in the URL |
+| `-w`, `--wide` | Adds the owner, the roles, the ready pods, the databases and where the password comes from. Only `dbfwd list` has it |
 | `--kubeconfig <path>` | Uses that kubeconfig in place of `KUBECONFIG`. It is `WithEnv("KUBECONFIG", path)` |
 | `--kubectl <path>` | Runs that `kubectl`. It is `WithTool("kubectl", path)` |
 
 The URL names the context and the role, as `?context=` and `?role=` (D6).
 Each flag becomes an option of `Resolve` (D11, `docs/API.md`).
+
+The flags of `dbfwd list` follow `kubectl`, and edit the listing URL: `-n
+prod --context x pg*` is `k://pg*.prod?context=x`. A flag that disagrees
+with the URL is an error, such as `-n dev` with `*.prod`. `usql` builds the
+URL of `\k` in the same way.
 
 ## The password
 

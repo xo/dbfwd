@@ -389,6 +389,30 @@ if dbfwd.Handles(u) {
 The blank import follows `database/sql`: a program links only the backends it
 imports. `usql` imports `k8s`, and later the others.
 
+### List
+
+`List` lists the databases that a backend can reach, for the `\k` command of
+`usql` and `dbfwd list` (D18). `docs/LIST.md` holds what a row is, what it
+reads and what RBAC it needs.
+
+```go
+// List lists the databases that u names, such as k://*, k://*.prod or
+// k://pg*.prod. It reads no credential and starts no forward.
+func List(ctx context.Context, u *dburl.URL, opts ...Option) (*Listing, error)
+
+// Lister is a Backend that can list its databases.
+type Lister interface {
+	List(ctx context.Context, u *dburl.URL, cfg Config) (*Listing, error)
+}
+```
+
+`Listing` holds the scope that `List` resolved, one `Entry` for each
+database, and a `Skip` for each kind that RBAC hid. An `Entry` holds the
+`Target`, the operator, the shortest URL that `Resolve` maps to the same
+database, the roles, the ready pods, the databases and where the password
+comes from. No field holds a password. A backend that is not a `Lister`
+returns `ErrUnsupported`.
+
 ## The k8s package
 
 `k8s` registers itself as `k8s` from `init`, and exports nothing else. It
@@ -400,7 +424,8 @@ holds:
 3. The rules of each operator, and the map from an operator to a scheme (D8,
    D9).
 4. The pod spec rules for a database with no operator.
-5. The `kubectl` runner.
+5. The listing of the databases of a namespace or of every namespace (D18).
+6. The `kubectl` runner.
 
 The runner is an unexported interface, so that a test replaces it with a fake
 or with recorded JSON (D12):

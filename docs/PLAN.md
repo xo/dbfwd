@@ -19,8 +19,10 @@ The design is decided, and the implementation covers every operator of tier
    lookup chain, the rules of every supported operator, the pod spec rules
    for a database with no operator, and the watch that reconnects a forward
    (D16).
-3. The command `cmd/dbfwd`.
-4. Unit tests against a fake `kubectl`, replay tests of recorded clusters, and
+3. The command `cmd/dbfwd`, with `dbfwd list`.
+4. `List`, which lists the databases of a namespace or of every namespace
+   (D18, `docs/LIST.md`).
+5. Unit tests against a fake `kubectl`, replay tests of recorded clusters, and
    a cluster suite for each operator and for databases with no operator, in
    the `test` module (D12, `docs/TESTING.md`).
 
@@ -105,12 +107,14 @@ fake tool and recorded output for the tests (D12).
    through a forward, such as that of ECK, whose name is not `127.0.0.1`. This
    is work in `dbimp`.
 4. Tier 3 databases: add the pod spec rules of each in `docs/LOOKUP.md`.
+5. Make each cluster suite call `List` on its fixture, and check that the
+   database is one row with a URL that the suite resolves.
 
 ## Open questions
 
 Ask Ken. Do not answer one on your own.
 
-1. Listing the databases of a cluster, for a `usql` command such as `\k`
-   (D18, `docs/LIST.md`). Ken decides the name and the conventions after
-   `usql` and the flagship models have read the design.
+1. D18, the listing of the databases of a cluster, is built as
+   `docs/LIST.md` describes, and is still Proposed. Ken decides whether it is
+   Decided.
 

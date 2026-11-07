@@ -6,6 +6,7 @@
 //	dbfwd usql k://pg-rw.prod/ -- -c 'select 1'
 //	dbfwd forward k://my-pg.dev/
 //	dbfwd lookup k://pg-rw.prod/
+//	dbfwd list -A
 //
 // docs/CLI.md in the repository holds every command and flag.
 package main
@@ -53,6 +54,16 @@ func main() {
 			ox.Exec(lookup),
 			ox.ValidArgs(1, 1),
 			flags(false),
+		),
+		ox.Sub(
+			ox.Usage("list", "list the databases that dbfwd can reach"),
+			ox.Exec(list),
+			ox.ValidArgs(0, 1),
+			flags(false).
+				Bool("all-namespaces", "list the databases of every namespace", ox.Short("A")).
+				String("namespace", "list the databases of this namespace", ox.Short("n")).
+				String("context", "use this context of the kubeconfig").
+				Bool("wide", "show the owner, the roles, the ready pods, the databases and the credential", ox.Short("w")),
 		),
 		ox.Sub(
 			ox.Usage("clients", "list the client of each database type"),

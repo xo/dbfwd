@@ -1,7 +1,8 @@
 # Listing the databases in a cluster
 
-Status: proposed in D18. Nothing here is built yet. Ken decides the name and
-the conventions after `usql` and the flagship models have read it.
+Status: built, as D18 describes. `dbfwd.List` and the command `dbfwd list`
+do what this document says. The `\k` command of `usql` calls the same
+`List`.
 
 `usql` asks for a meta command, such as `\k`, that lists the databases that
 `dbfwd` can reach, with one row for each database and the URL to pass to
@@ -164,6 +165,11 @@ The URL of a row is the shortest that `Resolve` maps to the same database:
 For a database with no operator, the URL can match its Service before its
 StatefulSet. Both reach the same database, which is what the URL promises.
 
+The check leaves out lookup step 4, the Helm release, because a listing does
+not read releases as such. A Helm release whose name is the name of a row,
+and whose Service is another database, is the one case where the URL of a row
+can reach another database.
+
 ## What counts as a database with no operator
 
 A StatefulSet, a Deployment or a pod that nothing owns is a row only when its
@@ -171,10 +177,13 @@ pod template has a sign of a database. Listing every workload and guessing is
 noisy, so the sign is one of these, in order:
 
 1. A container image that a pod spec rule of `docs/LOOKUP.md` knows, such as
-   `postgres`, `mysql`, `mariadb` or `bitnami/postgresql`. This is the sign
-   that sets the type of the row.
-2. A container port whose name the rules know, such as `postgresql` or
-   `mysql`, with the default port of that database.
+   `postgres`, `mysql`, `mariadb` or `bitnami/postgresql`.
+2. An environment that a pod spec rule knows, such as `POSTGRES_PASSWORD` or
+   `MYSQL_ROOT_PASSWORD`.
+
+A port alone is not a sign, because many programs that are not databases
+listen on 5432 or 3306. A database that no driver of `usql` reaches, such as
+MongoDB or Redis, is no row, because `Resolve` cannot connect to it.
 
 A Helm label, such as `app.kubernetes.io/instance`, names the release in
 `Owner` but is not a sign by itself. A workload with no sign is no row. A
@@ -243,8 +252,19 @@ commands mean the same thing.
 
 ## Testing
 
-The unit tests run `List` against the fake `kubectl` with the fixtures of
-the lookup tests. The cluster suites call `List` on each fixture namespace and
-check that the database of the fixture is one row, with the URL that the
-suite already resolves. The recorder records the calls, so the replay tests
-cover a listing too.
+The unit tests in `k8s/list_test.go` run `List` against the fake `kubectl`,
+with a namespace that holds a CloudNativePG cluster with a Pooler and a
+Database, a StatefulSet of the official postgres image, a web server, and two
+clusters of different operators with the same name. They check each row, the
+filters, every namespace, a forbidden kind, and that no call reads a Secret.
+`cmd/dbfwd/list_test.go` checks how the command builds the URL from its
+flags, and the table it prints.
+
+`dbfwd list` was run by hand against the kind cluster of the suites, on
+2026-11-08, and listed the CloudNativePG, mariadb-operator and MOCO fixtures
+in about half a second. The URL of a row of a plain StatefulSet resolved to
+the same database.
+
+The cluster suites do not call `List` yet. When they do, each suite checks
+that the database of its fixture is one row, with a URL that the suite
+already resolves.
