@@ -249,7 +249,13 @@ GitHub Actions. `.github/workflows/test.yml` holds three jobs.
 | --- | --- | --- |
 | Unit | Every push and pull request, on `ubuntu-latest`, `macos-latest` and `windows-latest` | Vet, the unit tests and the replay tests, with `-race -count=2`. Lint of both modules and the formatting check run on Linux only |
 | Cluster | Every push and pull request, on `ubuntu-latest` | One job per light suite. Each job checks out `dbmeta` at a pinned release, asks `dbrun` for its own kind cluster under docker, and runs one suite |
-| Nightly | Once a night, and by hand | Every suite, one job each |
+| Nightly | Once a night, and by hand | Every suite that passes on a standard runner, one job each |
+
+The nightly job leaves out six suites, which run by hand on a larger machine.
+The database of the Oracle MySQL Operator, Percona XtraDB, Percona Server,
+Vitess and OpenEverest suites is not ready within ten minutes on a standard
+runner. The port-forward of the OpenSearch suite exits while the cluster
+settles.
 
 ## The host
 

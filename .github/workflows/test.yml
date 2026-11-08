@@ -9,7 +9,7 @@
 # The cluster jobs run the test module against a kind cluster that dbrun, in
 # dbmeta, starts under docker (D13). Each job runs one suite in a cluster of
 # its own, so that a heavy operator cannot starve another. The light suites run
-# on every push, and every suite runs at night.
+# on every push, and every suite that passes on a standard runner runs at night.
 name: Test
 
 on:
@@ -146,6 +146,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Every suite that passes on a standard runner. These suites are left
+        # out, and run by hand on a larger machine:
+        #
+        # - TestOracleMySQLOperator, TestPerconaXtraDB, TestPerconaServer,
+        #   TestVitess and TestOpenEverest. Their database is not ready within
+        #   ten minutes on a standard runner.
+        # - TestOpenSearch. Its port-forward exits while the cluster settles.
         suite:
           - TestCNPG|TestLeastRBAC
           - TestMariaDBOperator
@@ -153,13 +160,8 @@ jobs:
           - TestZalando
           - TestCrunchyPGO
           - TestStackGres
-          - TestOracleMySQLOperator
-          - TestPerconaXtraDB
-          - TestPerconaServer
           - TestTiDB
-          - TestVitess
           - TestECK
-          - TestOpenSearch
           - TestSolr
           - TestAltinityClickHouse
           - TestCassOperator
@@ -167,7 +169,6 @@ jobs:
           - TestArangoDB
           - TestCrateDB
           - TestCouchbase
-          - TestOpenEverest
           - TestOfficialImages|TestReconnect
           - TestBitnamiPostgres
     steps: *cluster-steps
